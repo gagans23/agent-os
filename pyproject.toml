@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-os"
+version = "0.1.0"
+description = "A self-improving agent platform that uses Ninja Harness as its evaluation gate."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Gagan Singh", email = "gagans23@github.com" }]
+keywords = ["ai-agents", "agent-platform", "memory", "skills", "evaluation"]
+dependencies = [
+  "pyyaml>=6.0",
+  # The evaluation gate. Until published to PyPI, install from a local checkout:
+  #   pip install -e ../ninja-harness
+  "ninja-harness>=0.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.4"]
+
+[project.scripts]
+agent-os = "agent_os.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agent_os"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]

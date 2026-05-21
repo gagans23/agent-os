@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Runtime state — DO NOT commit live memory, sessions, traces, or secrets
+agent_state/state.db
+agent_state/sessions/*.json
+traces/
+*.log
+
+# Secrets — never commit
+.env
+.env.local
+secrets.yaml
+credentials.json
+*token*.txt
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.DS_Store
