@@ -112,10 +112,20 @@ SQLite persistent jobs · trace recorder · skill registry · agent profiles ·
 command router (`/eval /skills /agents /job /trace /status /ping /browser-demo`) ·
 Ninja Harness report after every run.
 
-**Level 2 — Reliability Layer** *(next)*
-Permanent Cloudflare named tunnel · bridge process supervisor · health checks ·
-structured logs · retries · timeout policy · token health check · sender-allowlist
-tests · daily Ninja eval summary.
+**Level 2 — Reliability Layer** ✅ *(this release)*
+Bridge process supervisor (`supervisor.py`, restart + backoff) · health checks
+(`health.py`, `/health`) · structured JSON logs (`logging_setup.py`) · retries +
+timeout policy (`reliability.py`) · token health without leaking secrets
+(`token_health.py`) · sender allowlist, fail-closed (`allowlist.py`) · daily eval
+summary (`daily_eval.py`). Deploy templates for the permanent Cloudflare named
+tunnel, systemd/launchd supervisor service, and daily-eval schedule are in
+[`deploy/`](deploy/) — you run those with your own accounts.
+
+```bash
+agent-os health                         # detailed health checks
+agent-os supervise -- python bridge.py  # keep your bridge alive
+agent-os daily-eval                      # daily reliability summary
+```
 
 **Level 3 — Controlled Autonomy**
 `/approve` & `/reject` · risk classifier (read-only auto-runs; write/send/deploy

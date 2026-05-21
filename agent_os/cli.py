@@ -83,6 +83,34 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0 if (result.verdict == "PASS" and not result.flagged) else 2
 
 
+def _cmd_health(args: argparse.Namespace) -> int:
+    from agent_os.health import run_health_checks
+
+    report = run_health_checks(args.state_dir, args.skills_dir, args.traces_dir)
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        print(report.render())
+    return 0 if report.status != "down" else 1
+
+
+def _cmd_supervise(args: argparse.Namespace) -> int:
+    from agent_os.logging_setup import configure
+    from agent_os.supervisor import Supervisor, SupervisorPolicy
+
+    configure(logfile=args.logfile)
+    policy = SupervisorPolicy(max_restarts=args.max_restarts)
+    Supervisor(args.command, policy).run()
+    return 0
+
+
+def _cmd_daily_eval(args: argparse.Namespace) -> int:
+    from agent_os.daily_eval import daily_summary
+
+    print(daily_summary(state_dir=args.state_dir, suite_path=args.suite))
+    return 0
+
+
 def _cmd_router(args: argparse.Namespace) -> int:
     """Dispatch a WhatsApp-style command via the CommandRouter."""
     router = CommandRouter(
@@ -154,6 +182,24 @@ def main(argv: list[str] | None = None) -> int:
     p_cmd.add_argument("--traces-dir", default="traces")
     p_cmd.add_argument("--suite", default=None, help="Ninja Harness suite path for /eval.")
     p_cmd.set_defaults(func=_cmd_router)
+
+    p_hp = sub.add_parser("health", help="Run health checks.")
+    p_hp.add_argument("--state-dir", default="agent_state")
+    p_hp.add_argument("--skills-dir", default="skills")
+    p_hp.add_argument("--traces-dir", default="traces")
+    p_hp.add_argument("--json", action="store_true")
+    p_hp.set_defaults(func=_cmd_health)
+
+    p_sup = sub.add_parser("supervise", help="Keep a bridge/agent process alive (restart on crash).")
+    p_sup.add_argument("command", nargs="+", help="The process command, e.g. python bridge.py")
+    p_sup.add_argument("--max-restarts", type=int, default=10)
+    p_sup.add_argument("--logfile", default=None)
+    p_sup.set_defaults(func=_cmd_supervise)
+
+    p_de = sub.add_parser("daily-eval", help="Print a daily reliability summary.")
+    p_de.add_argument("--state-dir", default="agent_state")
+    p_de.add_argument("--suite", default=None)
+    p_de.set_defaults(func=_cmd_daily_eval)
 
     args = parser.parse_args(argv)
     return args.func(args)

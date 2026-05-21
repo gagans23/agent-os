@@ -1,0 +1,23 @@
+# systemd unit to supervise your bridge via agent-os (Linux).
+# Install (user service):
+#   cp deploy/agent-os.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now agent-os
+#
+# Edit ExecStart, WorkingDirectory, and the env file path for your setup.
+# Put secrets in the EnvironmentFile (chmod 600), NOT in this unit.
+
+[Unit]
+Description=agent-os bridge supervisor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/youruser/agent-os
+EnvironmentFile=-/home/youruser/agent-os/.env
+ExecStart=/usr/bin/env agent-os supervise --logfile agent_state/bridge.log -- python /home/youruser/agent-os/your_bridge.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -72,6 +72,7 @@ class CommandRouter:
             "ping": self._ping,
             "help": lambda a: self._help(),
             "status": lambda a: self._status(),
+            "health": lambda a: self._health(),
             "agents": lambda a: self._agents(),
             "skills": lambda a: self._skills(),
             "eval": lambda a: self._eval(),
@@ -93,6 +94,7 @@ class CommandRouter:
             "Commands:\n"
             "  /ping            liveness\n"
             "  /status          health + recent jobs\n"
+            "  /health          detailed health checks\n"
             "  /agents          list agent profiles\n"
             "  /skills          list skills\n"
             "  /eval            run the eval suite (Ninja Harness)\n"
@@ -101,11 +103,26 @@ class CommandRouter:
             "  /trace <id>      show a job's trace summary"
         )
 
+    def _health(self) -> str:
+        from agent_os.health import run_health_checks
+
+        report = run_health_checks(
+            state_dir=self.memory.root, skills_dir=self.skills.root,
+            traces_dir=self.recorder.root,
+        )
+        return report.render()
+
     def _status(self) -> str:
+        from agent_os.health import run_health_checks
+
+        report = run_health_checks(
+            state_dir=self.memory.root, skills_dir=self.skills.root,
+            traces_dir=self.recorder.root,
+        )
         stats = self.jobs.stats()
         recent = self.jobs.list(limit=5)
         lines = [
-            f"agent-os {__version__} — OK",
+            f"agent-os {__version__} — health: {report.status.upper()}",
             f"Jobs: {stats['total']} total · pass rate {stats['pass_rate']:.0%}",
         ]
         if stats["by_certification"]:

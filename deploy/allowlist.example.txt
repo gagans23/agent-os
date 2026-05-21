@@ -1,0 +1,7 @@
+# Authorized senders — one per line. Copy to agent_state/allowlist.txt and edit.
+# Phone numbers are normalized (formatting is ignored). Usernames are lowercased.
+# The allowlist FAILS CLOSED: if this file is empty, every sender is denied.
+
+# +15551234567
+# +447700900000
+# your_whatsapp_handle

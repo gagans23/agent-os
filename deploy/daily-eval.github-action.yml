@@ -1,0 +1,30 @@
+# Daily reliability summary via GitHub Actions.
+# Copy to .github/workflows/daily-eval.yml in your deployment repo.
+# Set AGENT_OS_SUITE (repo variable) to a Ninja Harness suite path for a real
+# regression suite; otherwise it summarizes recent job outcomes.
+# To notify your phone, add a NINJA_NOTIFY_WEBHOOK / Slack / Telegram secret and
+# pipe the summary to ninja-harness's scripts/notify.py.
+
+name: Daily agent-os eval
+on:
+  schedule:
+    - cron: "0 13 * * *"   # 13:00 UTC daily
+  workflow_dispatch: {}
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    env:
+      AGENT_OS_SUITE: ${{ vars.AGENT_OS_SUITE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          pip install -e ../ninja-harness 2>/dev/null || pip install ninja-harness || true
+          pip install -e .
+      - name: Daily eval summary
+        run: |
+          agent-os daily-eval | tee summary.txt
+          { echo '```'; cat summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

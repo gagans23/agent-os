@@ -1,0 +1,15 @@
+# Cloudflare named-tunnel config template. Replace the placeholders and run:
+#   cloudflared tunnel --config deploy/cloudflared-config.example.yml run
+# Run cloudflared as a service for a *permanent* tunnel.
+#
+# Do NOT commit your real credentials JSON.
+
+tunnel: REPLACE_WITH_TUNNEL_ID
+credentials-file: /home/youruser/.cloudflared/REPLACE_WITH_TUNNEL_ID.json
+
+ingress:
+  # Your bridge's public hostname → the local port your bridge/webhook listens on.
+  - hostname: agent.example.com
+    service: http://localhost:8080
+  # Required catch-all.
+  - service: http_status:404

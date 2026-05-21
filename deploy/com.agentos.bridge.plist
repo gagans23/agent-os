@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd agent to supervise your bridge via agent-os (macOS).
+  Install:
+    cp deploy/com.agentos.bridge.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.agentos.bridge.plist
+  Edit the paths and arguments for your setup. Put secrets in a sourced env file,
+  not in this plist.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.agentos.bridge</string>
+  <key>WorkingDirectory</key>
+  <string>/Users/youruser/agent-os</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>agent-os</string>
+    <string>supervise</string>
+    <string>--logfile</string>
+    <string>agent_state/bridge.log</string>
+    <string>--</string>
+    <string>python</string>
+    <string>/Users/youruser/agent-os/your_bridge.py</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardErrorPath</key>
+  <string>/Users/youruser/agent-os/agent_state/launchd.err.log</string>
+  <key>StandardOutPath</key>
+  <string>/Users/youruser/agent-os/agent_state/launchd.out.log</string>
+</dict>
+</plist>
