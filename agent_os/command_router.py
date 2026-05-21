@@ -47,16 +47,28 @@ def _demo_browser_agent(command: str, context: str, job: JobRecorder) -> str:
     )
 
 
+def _default_agent(command: str, context: str, job: JobRecorder) -> str:
+    """Safe default agent for /run. Composes an answer; performs no external action.
+    Replace with your real agents (researcher/operator/builder) per profile."""
+    job.add_step("plan", f"Handle task: {command[:80]}")
+    job.add_step("action", "Composed a response (default agent — no external side effects).")
+    return f"Handled: {command}"
+
+
 class CommandRouter:
     """Routes commands to handlers and returns plain-text replies."""
 
     def __init__(self, *, jobs: JobStore | None = None, memory: AgentMemory | None = None,
                  skills: SkillRegistry | None = None, recorder: TraceRecorder | None = None,
-                 suite_path: str | None = None) -> None:
+                 approvals=None, agent_fn=None, suite_path: str | None = None) -> None:
+        from agent_os.approvals import ApprovalStore
+
         self.jobs = jobs or JobStore()
         self.memory = memory or AgentMemory()
         self.skills = skills or SkillRegistry()
         self.recorder = recorder or TraceRecorder()
+        self.approvals = approvals or ApprovalStore(Path(self.memory.root) / "approvals.db")
+        self.agent_fn = agent_fn or _default_agent
         self.suite_path = suite_path
 
     # --- dispatch ----------------------------------------------------------
@@ -79,6 +91,11 @@ class CommandRouter:
             "browser-demo": lambda a: self._browser_demo(),
             "job": self._job,
             "trace": self._trace,
+            "run": self._run,
+            "risk": self._risk,
+            "pending": lambda a: self._pending(),
+            "approve": self._approve,
+            "reject": self._reject,
         }.get(cmd)
         if handler is None:
             return f"Unknown command: /{cmd}\n\n{self._help()}"
@@ -100,7 +117,12 @@ class CommandRouter:
             "  /eval            run the eval suite (Ninja Harness)\n"
             "  /browser-demo    run the demo agent end-to-end\n"
             "  /job <id>        show a job record\n"
-            "  /trace <id>      show a job's trace summary"
+            "  /trace <id>      show a job's trace summary\n"
+            "  /run <task>      submit a task (auto-runs if read-only; else needs approval)\n"
+            "  /risk <task>     show the risk classification for a task\n"
+            "  /pending         list actions awaiting approval\n"
+            "  /approve <id>    approve & execute a pending action\n"
+            "  /reject <id>     reject a pending action"
         )
 
     def _health(self) -> str:
@@ -205,6 +227,83 @@ class CommandRouter:
         )
         return result.summary + f"\n\nJob: {result.job_id[-8:]}  (try /trace {result.job_id[-8:]})"
 
+    # --- Level 3: controlled autonomy --------------------------------------
+
+    def _profile_for(self, level: str) -> str:
+        # Read-only → researcher; anything that writes/sends/deploys → operator.
+        return "researcher" if level == "READ_ONLY" else "operator"
+
+    def _execute(self, task: str, profile: str) -> str:
+        from agent_os.runner import run_job
+
+        result = run_job(task, self.agent_fn, profile=profile, memory=self.memory,
+                         skills=self.skills, recorder=self.recorder, jobs=self.jobs)
+        return result, result.summary + f"\n\nJob: {result.job_id[-8:]}"
+
+    def _run(self, args: list[str]) -> str:
+        from agent_os.risk import classify_risk
+
+        task = " ".join(args).strip()
+        if not task:
+            return "Usage: /run <task>"
+        assessment = classify_risk(task)
+        if not assessment.requires_approval:
+            _result, summary = self._execute(task, self._profile_for("READ_ONLY"))
+            return f"[risk: READ_ONLY → auto-run]\n{summary}"
+        approval_id = self.approvals.enqueue(
+            task, self._profile_for(assessment.level.label),
+            assessment.level.label, assessment.reason,
+        )
+        return (
+            f"⛔ Needs approval — risk: {assessment.level.label} ({assessment.reason}).\n"
+            f"Task: {task}\n"
+            f"Approve:  /approve {approval_id}\n"
+            f"Reject:   /reject {approval_id}"
+        )
+
+    def _risk(self, args: list[str]) -> str:
+        from agent_os.risk import classify_risk
+
+        task = " ".join(args).strip()
+        if not task:
+            return "Usage: /risk <task>"
+        a = classify_risk(task)
+        gate = "auto-run" if not a.requires_approval else "REQUIRES APPROVAL"
+        return f"Risk: {a.level.label} → {gate}\nReason: {a.reason}"
+
+    def _pending(self) -> str:
+        items = self.approvals.list(status="pending")
+        if not items:
+            return "No actions awaiting approval. ✅"
+        lines = ["Pending approvals:"]
+        for a in items:
+            lines.append(f"  {a['id']}  [{a['risk_level']}]  {a['command'][:50]}")
+            lines.append(f"      /approve {a['id']}   /reject {a['id']}")
+        return "\n".join(lines)
+
+    def _approve(self, args: list[str]) -> str:
+        if not args:
+            return "Usage: /approve <id>"
+        rec = self.approvals.get(args[0])
+        if not rec:
+            return f"No approval found matching '{args[0]}'."
+        if rec["status"] != "pending":
+            return f"Approval {rec['id']} is already {rec['status']}."
+        result, summary = self._execute(rec["command"], rec["profile"])
+        self.approvals.set_decision(rec["id"], "approved", job_id=result.job_id)
+        return f"✅ Approved & executed [{rec['risk_level']}].\n{summary}"
+
+    def _reject(self, args: list[str]) -> str:
+        if not args:
+            return "Usage: /reject <id>"
+        rec = self.approvals.get(args[0])
+        if not rec:
+            return f"No approval found matching '{args[0]}'."
+        if rec["status"] != "pending":
+            return f"Approval {rec['id']} is already {rec['status']}."
+        self.approvals.set_decision(rec["id"], "rejected")
+        return f"🚫 Rejected approval {rec['id']}. No action taken."
+
     def _job(self, args: list[str]) -> str:
         if not args:
             return "Usage: /job <id>"
@@ -257,3 +356,4 @@ class CommandRouter:
     def close(self) -> None:
         self.jobs.close()
         self.memory.close()
+        self.approvals.close()

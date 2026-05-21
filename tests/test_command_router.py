@@ -76,3 +76,58 @@ def test_status_and_eval_fallback(router) -> None:
     # No suite configured → /eval falls back to job stats
     eval_out = router.handle("/eval")
     assert "Eval" in eval_out or "pass rate" in eval_out
+
+
+def test_health_command(router) -> None:
+    out = router.handle("/health")
+    assert "Health:" in out
+
+
+# --- Level 3: controlled autonomy ------------------------------------------
+
+def test_risk_command(router) -> None:
+    assert "REQUIRES APPROVAL" in router.handle("/risk send a whatsapp message")
+    assert "auto-run" in router.handle("/risk summarize the inbox")
+
+
+def test_run_read_only_auto_executes(router) -> None:
+    out = router.handle("/run summarize the latest research")
+    assert "auto-run" in out
+    assert "Ninja score" in out
+    # a job was created
+    assert len(router.jobs.list()) == 1
+
+
+def test_run_write_enqueues_for_approval(router) -> None:
+    out = router.handle("/run delete the old records")
+    assert "Needs approval" in out and "WRITE" in out
+    # no job yet; one pending approval
+    assert router.jobs.list() == []
+    assert len(router.approvals.list(status="pending")) == 1
+
+
+def test_approve_executes_and_reject_cancels(router) -> None:
+    router.handle("/run send a status message to the team")
+    pending = router.approvals.list(status="pending")
+    aid = pending[0]["id"]
+    # approve → executes (creates a job) and marks approved
+    out = router.handle(f"/approve {aid}")
+    assert "Approved & executed" in out
+    assert router.approvals.get(aid)["status"] == "approved"
+    assert len(router.jobs.list()) == 1
+
+    # a second task, then reject it
+    router.handle("/run deploy to production")
+    aid2 = router.approvals.list(status="pending")[0]["id"]
+    out2 = router.handle(f"/reject {aid2}")
+    assert "Rejected" in out2
+    assert router.approvals.get(aid2)["status"] == "rejected"
+
+
+def test_pending_lists(router) -> None:
+    router.handle("/run delete things")
+    assert "Pending approvals" in router.handle("/pending")
+
+
+def test_approve_unknown(router) -> None:
+    assert "No approval found" in router.handle("/approve zzzz")

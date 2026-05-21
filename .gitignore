@@ -10,7 +10,10 @@ venv/
 # Runtime state — DO NOT commit live memory, sessions, traces, or secrets
 agent_state/state.db
 agent_state/jobs.db
+agent_state/approvals.db
+agent_state/allowlist.txt
 agent_state/sessions/*.json
+agent_state/*.log
 traces/
 *.log
 

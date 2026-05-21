@@ -7,14 +7,22 @@ memory, a reusable skill library, full trace recording, and a propose-only
 self-improvement loop. Ninja Harness is the *evaluation/certification* layer it
 calls. Keeping them separate is deliberate: one runs agents, the other grades them.
 
-```
-command → profile → memory → skill → execute → trace → Ninja Harness eval
-        → propose improvement (human-approved) → report
+```mermaid
+flowchart LR
+    A["Command<br/>(WhatsApp / CLI)"] --> R[Router]
+    R --> K{Risk}
+    K -- read-only --> X[Execute]
+    K -- write/send/deploy --> Q["Approval<br/>/approve · /reject"]
+    Q --> X
+    X --> T[Trace] --> N[Ninja Harness] --> P["Propose<br/>improvement"] --> Z[Report]
 ```
 
-> Status: **v0.1 scaffold.** Core modules + the run→eval→propose loop are working.
-> Live integrations (WhatsApp/Meta, Gmail, Cloudflare Tunnel) are pluggable
-> adapters you wire with your own credentials — none are bundled or faked.
+📐 **Full diagrams & module map:** [docs/architecture.md](docs/architecture.md)
+
+> Status: **v0.3 — all three levels shipped.** Core + Reliability + Controlled
+> Autonomy are working and tested. Live integrations (WhatsApp/Meta, Gmail,
+> Cloudflare Tunnel, GitHub publish) are pluggable adapters you wire with your
+> own credentials — none are bundled or faked.
 
 ## Install
 
@@ -127,10 +135,19 @@ agent-os supervise -- python bridge.py  # keep your bridge alive
 agent-os daily-eval                      # daily reliability summary
 ```
 
-**Level 3 — Controlled Autonomy**
-`/approve` & `/reject` · risk classifier (read-only auto-runs; write/send/deploy
-require approval) · GitHub publishing flow · Gmail digest flow · WhatsApp command
-center.
+**Level 3 — Controlled Autonomy** ✅ *(this release)*
+Risk classifier (`risk.py`) · approval queue (`approvals.py`, `/pending`
+`/approve` `/reject`) · read-only tasks auto-run, write/send/deploy gated ·
+github-publish + gmail-digest skills. The agent never takes a privileged action
+without explicit human approval.
+
+```bash
+agent-os cmd "/run summarize the inbox"   # READ_ONLY → auto-runs
+agent-os cmd "/run send the weekly update" # SEND → queued for approval
+agent-os cmd "/pending"                     # list what's waiting
+agent-os cmd "/approve <id>"                # execute it
+agent-os cmd "/reject <id>"                 # cancel it
+```
 
 > Live integrations (WhatsApp/Meta, Gmail, Cloudflare) are pluggable adapters you
 > wire with your own credentials — none are bundled or faked.
