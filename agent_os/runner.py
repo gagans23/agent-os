@@ -19,6 +19,7 @@ from typing import Any
 
 from agent_os.agent_memory import AgentMemory
 from agent_os.improvement import ImprovementProposal, propose_improvement
+from agent_os.jobs import JobStore
 from agent_os.profiles import AgentProfile, get_profile
 from agent_os.skill_registry import Skill, SkillRegistry
 from agent_os.trace_recorder import JobRecorder, TraceRecorder
@@ -87,11 +88,15 @@ def run_job(
     memory: AgentMemory | None = None,
     skills: SkillRegistry | None = None,
     recorder: TraceRecorder | None = None,
+    jobs: JobStore | None = None,
     case_path: str | None = None,
     evaluate: bool = True,
 ) -> JobResult:
     """Execute one job end-to-end with tracing, evaluation, and an improvement
-    proposal. Pure orchestration — no external services are called here."""
+    proposal. Pure orchestration — no external services are called here.
+
+    If a JobStore is provided, the job is persisted (running → done/failed) so it
+    survives restarts and can be looked up later by id."""
     prof = profile if isinstance(profile, AgentProfile) else get_profile(profile)
     memory = memory or AgentMemory()
     skills = skills or SkillRegistry()
@@ -104,8 +109,15 @@ def run_job(
 
     job = recorder.start(command, agent_name=prof.name, task=command)
     job.set_metadata(profile=prof.name, skill=skill.name if skill else None)
+    if jobs is not None:
+        jobs.create(job.job_id, command, profile=prof.name, skill=skill.name if skill else "")
 
-    final = agent_fn(command, context, job)
+    try:
+        final = agent_fn(command, context, job)
+    except Exception as exc:  # noqa: BLE001 - record the failure durably
+        if jobs is not None:
+            jobs.finish(job.job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
+        raise
     job.set_final(final)
     trace_path = job.save_trace()
 
@@ -141,6 +153,18 @@ def run_job(
         verdict = "WARN"
     else:
         verdict = certification
+
+    if jobs is not None:
+        jobs.finish(
+            job.job_id,
+            status="done",
+            ninja_score=result.ninja_score if result else None,
+            certification=certification if result else None,
+            verdict=verdict if result else None,
+            flagged=flagged,
+            trace_path=str(trace_path),
+            report_path=report_path,
+        )
 
     summary = _whatsapp_summary(
         verdict, result, proposal,

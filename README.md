@@ -72,22 +72,58 @@ structured proposal — failure reason, suggested memory update, suggested skill
 patch — that **requires explicit human approval**. The agent never rewrites
 itself automatically.
 
+## Command surface (Level 1)
+
+The platform exposes a transport-agnostic command router — the same commands you'll
+wire to WhatsApp later. Try them locally with `agent-os cmd`:
+
+```bash
+agent-os cmd "/ping"            # liveness
+agent-os cmd "/status"          # health + recent jobs
+agent-os cmd "/agents"          # list agent profiles
+agent-os cmd "/skills"          # list skills + triggers
+agent-os cmd "/eval"            # run the Ninja Harness suite (or summarize jobs)
+agent-os cmd "/browser-demo"    # run the demo agent end-to-end
+agent-os cmd "/job f6df6f7d"    # show a persisted job (id or short prefix)
+agent-os cmd "/trace f6df6f7d"  # show a job's trajectory + score
+```
+
+Every run is persisted to **SQLite** (`agent_state/jobs.db`), so jobs survive
+restarts and you can look them up by id (or short suffix) afterward. Each major
+run leaves behind a **trace**, a **Ninja Harness score**, and (if weak) an
+**improvement proposal** — that's how the system compounds.
+
 ## CLI
 
 ```bash
 agent-os run "<command>" [--profile P] [--agent-cmd "python my_agent.py"] [--case case.yaml] [--json]
-agent-os skills      # list skills + triggers
-agent-os memory      # recent job outcomes
+agent-os cmd "/status"          # WhatsApp-style command surface
+agent-os skills                 # list skills + triggers
+agent-os memory                 # recent job outcomes
 ```
 
-`agent-os run` exits non-zero when a run is flagged, so it works as a CI gate.
+`agent-os run` (and `cmd` for write actions) exit non-zero when a run is flagged,
+so they work as a CI gate.
 
-## Roadmap
+## Roadmap (three levels)
 
-- v0.1 (this scaffold): core modules + run→eval→propose loop ✅
-- Next: production reliability (SQLite job persistence, webhook HMAC verification,
-  sender allowlist, audit logs, retry/timeout, daily eval, secrets-excluding
-  GitHub backup), then live WhatsApp/Gmail/Cloudflare adapters.
+**Level 1 — Agent OS Core** ✅ *(this release)*
+SQLite persistent jobs · trace recorder · skill registry · agent profiles ·
+command router (`/eval /skills /agents /job /trace /status /ping /browser-demo`) ·
+Ninja Harness report after every run.
+
+**Level 2 — Reliability Layer** *(next)*
+Permanent Cloudflare named tunnel · bridge process supervisor · health checks ·
+structured logs · retries · timeout policy · token health check · sender-allowlist
+tests · daily Ninja eval summary.
+
+**Level 3 — Controlled Autonomy**
+`/approve` & `/reject` · risk classifier (read-only auto-runs; write/send/deploy
+require approval) · GitHub publishing flow · Gmail digest flow · WhatsApp command
+center.
+
+> Live integrations (WhatsApp/Meta, Gmail, Cloudflare) are pluggable adapters you
+> wire with your own credentials — none are bundled or faked.
 
 ## License
 

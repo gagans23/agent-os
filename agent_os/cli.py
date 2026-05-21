@@ -3,6 +3,8 @@ agent-os CLI (standard-library argparse — no heavy deps of its own).
 
     agent-os run "summarize the BISAD inbox" --profile operator
     agent-os run "research X" --agent-cmd "python my_agent.py" --case case.yaml
+    agent-os cmd "/status"          # the WhatsApp-style command surface
+    agent-os cmd "/job f6df6f7d"
     agent-os skills
     agent-os memory
 """
@@ -16,6 +18,8 @@ import subprocess
 import sys
 
 from agent_os.agent_memory import AgentMemory
+from agent_os.command_router import CommandRouter
+from agent_os.jobs import JobStore
 from agent_os.runner import run_job
 from agent_os.skill_registry import SkillRegistry
 from agent_os.trace_recorder import JobRecorder, TraceRecorder
@@ -48,11 +52,12 @@ def _cmd_run(args: argparse.Namespace) -> int:
     memory = AgentMemory(args.state_dir)
     skills = SkillRegistry(args.skills_dir)
     recorder = TraceRecorder(args.traces_dir)
+    jobs = JobStore(f"{args.state_dir}/jobs.db")
     agent_fn = _command_agent(shlex.split(args.agent_cmd)) if args.agent_cmd else _demo_agent
 
     result = run_job(
         args.command, agent_fn,
-        profile=args.profile, memory=memory, skills=skills, recorder=recorder,
+        profile=args.profile, memory=memory, skills=skills, recorder=recorder, jobs=jobs,
         case_path=args.case, evaluate=not args.no_eval,
     )
     if args.json:
@@ -73,8 +78,24 @@ def _cmd_run(args: argparse.Namespace) -> int:
             print("Memory :", result.proposal.memory_suggestion)
             print("Skill  :", result.proposal.skill_patch_suggestion)
     memory.close()
+    jobs.close()
     # Non-zero exit unless it's a clean PASS at/above the profile threshold (CI gate).
     return 0 if (result.verdict == "PASS" and not result.flagged) else 2
+
+
+def _cmd_router(args: argparse.Namespace) -> int:
+    """Dispatch a WhatsApp-style command via the CommandRouter."""
+    router = CommandRouter(
+        jobs=JobStore(f"{args.state_dir}/jobs.db"),
+        memory=AgentMemory(args.state_dir),
+        skills=SkillRegistry(args.skills_dir),
+        recorder=TraceRecorder(args.traces_dir),
+        suite_path=args.suite,
+    )
+    text = " ".join(args.text)
+    print(router.handle(text))
+    router.close()
+    return 0
 
 
 def _cmd_skills(args: argparse.Namespace) -> int:
@@ -125,6 +146,14 @@ def main(argv: list[str] | None = None) -> int:
     p_mem.add_argument("--state-dir", default="agent_state")
     p_mem.add_argument("--limit", type=int, default=10)
     p_mem.set_defaults(func=_cmd_memory)
+
+    p_cmd = sub.add_parser("cmd", help="Dispatch a WhatsApp-style command (/status, /job <id>, ...).")
+    p_cmd.add_argument("text", nargs="+", help="The command, e.g. '/job f6df6f7d'.")
+    p_cmd.add_argument("--state-dir", default="agent_state")
+    p_cmd.add_argument("--skills-dir", default="skills")
+    p_cmd.add_argument("--traces-dir", default="traces")
+    p_cmd.add_argument("--suite", default=None, help="Ninja Harness suite path for /eval.")
+    p_cmd.set_defaults(func=_cmd_router)
 
     args = parser.parse_args(argv)
     return args.func(args)
