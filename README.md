@@ -52,6 +52,32 @@ Safety: PASS
 Artifact: traces/<job_id>/final.md
 ```
 
+## Cross-episode insights (v0.4)
+
+`insights.py` turns per-source summaries into structured **insights** — each a
+claim, its evidence (every point cites a source), an implication for a chosen
+lens, and a **delta vs the previous run** (the part that compounds, via memory):
+
+```bash
+python examples/podcast_digest_demo.py
+```
+
+```
+Cross-episode insights
+1) Shared theme: 'incentives'
+- Claim/theme: Acquired and Huberman Lab both touch on 'incentives'.
+- Evidence: Acquired: ... aligning incentives with investors; Huberman Lab: ...
+- Delta vs previous: New theme vs previous digest.
+
+[Ninja Harness] grounding=… hygiene=… cert=…
+```
+
+You supply the LLM `reasoner=` (for the rich prose) and your feed fetcher (to
+build `EpisodeSummary` objects). A deterministic keyword fallback ships so the
+loop runs and is testable without a model — and the digest is **scored by Ninja
+Harness** (grounding = claims backed by evidence; hygiene = concise), so weak
+synthesis gets flagged. See the [`podcast-digest`](skills/podcast-digest/SKILL.md) skill.
+
 ## The three core modules
 
 | Module | Responsibility |
