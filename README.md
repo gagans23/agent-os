@@ -76,7 +76,24 @@ You supply the LLM `reasoner=` (for the rich prose) and your feed fetcher (to
 build `EpisodeSummary` objects). A deterministic keyword fallback ships so the
 loop runs and is testable without a model — and the digest is **scored by Ninja
 Harness** (grounding = claims backed by evidence; hygiene = concise), so weak
-synthesis gets flagged. See the [`podcast-digest`](skills/podcast-digest/SKILL.md) skill.
+synthesis gets flagged.
+
+Run it from the command surface, plug in your model, or watch it compound:
+
+```bash
+agent-os cmd "/digest"                       # synthesize → score → persist as a job
+python examples/multiday_digest_demo.py      # New → Reinforced deltas across days
+```
+
+```python
+from agent_os.reasoners import LLMReasoner
+from agent_os.insights import CrossEpisodeSynthesizer
+synth = CrossEpisodeSynthesizer(reasoner=LLMReasoner(complete=my_model), memory=mem)
+```
+
+📐 **Deep dive (philosophy, schema, grounding, the compounding loop, the LLM
+prompt contract):** [docs/insights.md](docs/insights.md) ·
+skill: [`podcast-digest`](skills/podcast-digest/SKILL.md).
 
 ## The three core modules
 

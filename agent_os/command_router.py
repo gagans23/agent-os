@@ -55,12 +55,32 @@ def _default_agent(command: str, context: str, job: JobRecorder) -> str:
     return f"Handled: {command}"
 
 
+def _demo_episodes():
+    """Built-in demo episodes so /digest runs without a feed fetcher.
+    In production, supply `digest_source=` returning EpisodeSummary objects."""
+    from agent_os.insights import EpisodeSummary
+
+    return [
+        EpisodeSummary("acquired-vanguard", "Acquired",
+                       "Vanguard: the communist capitalist", published="2026-05-18",
+                       key_points=[
+                           "Vanguard is owned by its fund customers, aligning incentives with investors.",
+                           "Durable outcomes came from redesigning incentives, not heroics."]),
+        EpisodeSummary("huberman-epley", "Huberman Lab",
+                       "How to Overcome Social Anxiety", published="2026-05-18",
+                       key_points=[
+                           "Social anxiety improves with real exposure, not simulated practice.",
+                           "Durable change comes from updating incentives and feedback."]),
+    ]
+
+
 class CommandRouter:
     """Routes commands to handlers and returns plain-text replies."""
 
     def __init__(self, *, jobs: JobStore | None = None, memory: AgentMemory | None = None,
                  skills: SkillRegistry | None = None, recorder: TraceRecorder | None = None,
-                 approvals=None, agent_fn=None, suite_path: str | None = None) -> None:
+                 approvals=None, agent_fn=None, suite_path: str | None = None,
+                 digest_source=None, reasoner=None, digest_lens: str = "founder/investor") -> None:
         from agent_os.approvals import ApprovalStore
 
         self.jobs = jobs or JobStore()
@@ -70,6 +90,10 @@ class CommandRouter:
         self.approvals = approvals or ApprovalStore(Path(self.memory.root) / "approvals.db")
         self.agent_fn = agent_fn or _default_agent
         self.suite_path = suite_path
+        # Cross-episode digest: supply your feed fetcher + LLM reasoner in production.
+        self.digest_source = digest_source or _demo_episodes
+        self.reasoner = reasoner
+        self.digest_lens = digest_lens
 
     # --- dispatch ----------------------------------------------------------
 
@@ -89,6 +113,7 @@ class CommandRouter:
             "skills": lambda a: self._skills(),
             "eval": lambda a: self._eval(),
             "browser-demo": lambda a: self._browser_demo(),
+            "digest": lambda a: self._digest(),
             "job": self._job,
             "trace": self._trace,
             "run": self._run,
@@ -116,6 +141,7 @@ class CommandRouter:
             "  /skills          list skills\n"
             "  /eval            run the eval suite (Ninja Harness)\n"
             "  /browser-demo    run the demo agent end-to-end\n"
+            "  /digest          synthesize a cross-episode insight digest\n"
             "  /job <id>        show a job record\n"
             "  /trace <id>      show a job's trace summary\n"
             "  /run <task>      submit a task (auto-runs if read-only; else needs approval)\n"
@@ -226,6 +252,41 @@ class CommandRouter:
             recorder=self.recorder, jobs=self.jobs,
         )
         return result.summary + f"\n\nJob: {result.job_id[-8:]}  (try /trace {result.job_id[-8:]})"
+
+    def _digest(self) -> str:
+        """Synthesize a cross-episode digest, score it, and persist it as a job.
+        Uses self.digest_source (feed fetcher) + self.reasoner (your LLM)."""
+        from agent_os.insights import CrossEpisodeSynthesizer
+        from agent_os.runner import run_job
+
+        episodes = self.digest_source()
+        if not episodes:
+            return "No episodes to digest. Wire `digest_source=` to your feed fetcher."
+        synth = CrossEpisodeSynthesizer(reasoner=self.reasoner, memory=self.memory)
+        digest = synth.synthesize(episodes, lens=self.digest_lens)
+        final, refs = digest.as_trace_inputs()
+
+        # Grade the digest with Ninja Harness: grounding (claims vs evidence) + hygiene.
+        try:
+            from ninja_harness.schemas import EvaluationCase
+            case = EvaluationCase(task="cross-episode digest", references=refs)
+        except ImportError:
+            case = None
+
+        def _digest_agent(command, context, job):
+            for ep in episodes:
+                job.add_step("observation", f"{ep.show}: {ep.title}")
+            for ins in digest.insights:
+                job.add_step("action", f"insight: {ins.claim}")
+            return final
+
+        result = run_job("podcast cross-episode digest", _digest_agent,
+                         profile="researcher", memory=self.memory, skills=self.skills,
+                         recorder=self.recorder, jobs=self.jobs, case=case)
+        reasoner_note = "LLM reasoner" if self.reasoner else "deterministic fallback"
+        return (digest.render()
+                + f"\n\n[{reasoner_note}] {result.verdict} · score {result.ninja_score:.1f}"
+                + f" · Job {result.job_id[-8:]} (try /trace {result.job_id[-8:]})")
 
     # --- Level 3: controlled autonomy --------------------------------------
 

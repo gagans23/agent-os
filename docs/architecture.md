@@ -135,6 +135,26 @@ flowchart TB
 
 ---
 
+## Cross-episode insight synthesis
+
+A reasoning *skill* layered on the spine: per-source summaries → structured
+insights (claim → evidence → implication → delta-vs-previous) → scored by Ninja
+Harness, with the LLM pluggable. Deep dive: [`docs/insights.md`](insights.md).
+
+```mermaid
+flowchart LR
+    E["EpisodeSummary[]"] --> S[CrossEpisodeSynthesizer]
+    M[("memory: prev digest")] --> S
+    S --> R{reasoner}
+    R -- your LLM --> D[Digest]
+    R -- deterministic --> D
+    D --> N["Ninja Harness: grounding + hygiene"]
+    N --> J[("job: trace + score")]
+```
+
+`/digest` runs this as a first-class job (trace, score, memory delta, proposal).
+Fetching paid providers is a cost action → routed through the `/approve` gate.
+
 ## What stays pluggable (never faked)
 
 The live transports and external actions are adapters **you** wire with your own

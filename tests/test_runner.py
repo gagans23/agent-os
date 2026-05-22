@@ -65,3 +65,13 @@ def test_no_eval_skips_harness(tmp_path) -> None:
     assert res.result is None
     assert res.report_path is None
     assert res.certification == "UNKNOWN"
+
+
+def test_run_job_accepts_inmemory_case(tmp_path) -> None:
+    from ninja_harness.schemas import EvaluationCase
+
+    case = EvaluationCase(task="t", references=["the page was opened", "stories extracted"])
+    res = run_job("research the browser demo", _clean_agent, profile="researcher",
+                  case=case, **_harness(tmp_path))
+    # grounding metric should be applicable because references were supplied
+    assert res.result.metric_by_name("grounding").is_applicable

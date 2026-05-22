@@ -44,15 +44,15 @@ class JobResult:
     summary: str
 
 
-def _evaluate(trace: dict, case_path: str | None):
+def _evaluate(trace: dict, case_path: str | None, case: Any = None):
     """Run Ninja Harness against a trace dict. Imported lazily so the rest of
-    agent-os works even if ninja-harness isn't installed."""
+    agent-os works even if ninja-harness isn't installed. An in-memory `case`
+    (a ninja_harness EvaluationCase) takes precedence over `case_path`."""
     from ninja_harness.adapters import detect_adapter
     from ninja_harness.scoring.ninja_score import NinjaScoreAggregator
 
     run = detect_adapter(trace).parse(trace)
-    case = None
-    if case_path:
+    if case is None and case_path:
         from ninja_harness.datasets.loader import load_eval_case
 
         case = load_eval_case(case_path)
@@ -90,6 +90,7 @@ def run_job(
     recorder: TraceRecorder | None = None,
     jobs: JobStore | None = None,
     case_path: str | None = None,
+    case: Any = None,
     evaluate: bool = True,
 ) -> JobResult:
     """Execute one job end-to-end with tracing, evaluation, and an improvement
@@ -125,7 +126,7 @@ def run_job(
     report_path = None
     proposal = None
     if evaluate:
-        result = _evaluate(job.to_trace(), case_path)
+        result = _evaluate(job.to_trace(), case_path, case=case)
         report_path = str(job.save_report(result))
         memory.record_outcome(
             job.job_id, command, result.ninja_score, result.certification,

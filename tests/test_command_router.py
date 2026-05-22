@@ -83,6 +83,16 @@ def test_health_command(router) -> None:
     assert "Health:" in out
 
 
+def test_digest_command_runs_and_scores(router) -> None:
+    out = router.handle("/digest")
+    assert "Cross-episode insights" in out
+    assert "Job" in out and "score" in out
+    # a digest job was persisted + evaluated
+    jobs = router.jobs.list()
+    assert len(jobs) == 1
+    assert jobs[0]["ninja_score"] is not None
+
+
 # --- Level 3: controlled autonomy ------------------------------------------
 
 def test_risk_command(router) -> None:
