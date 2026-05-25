@@ -81,7 +81,11 @@ python examples/ahaan_maths_demo.py
   Ollama-first, stdlib HTTP, powers reasoner/embedder/agent_fn; `/model`.
 - **3 Easy install + UI** ✅ — `install.sh` + `webui.py` (`agent-os ui`).
 - **4 Pro-coder + connectors** — next: Claude Code/Cursor/Aider links, Onyx/MCP
-  bridge, **Understand-Anything** knowledge-graph import into the Brain.
+  bridge, **Understand-Anything** knowledge-graph import into the Brain,
+  **Agent Skills** import (align `SKILL.md` with agentskills.io; import
+  anthropics/skills), and **knowledge-work plugin** role bundles
+  (anthropics/knowledge-work-plugins; bridge their `.mcp.json` connectors). See
+  docs/roadmap.md → Planned integrations.
 - **5 Watchers + dashboards** — later: folder/event watchers, trend dashboards,
   knowledge-graph view of the Brain.
 
