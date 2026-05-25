@@ -105,13 +105,21 @@ class Provider(ABC):
         return self.embed
 
     def as_agent_fn(self) -> Callable[[str, str, object], str]:
-        """An agent_fn(command, context, job) for the command router/runner."""
+        """An agent_fn(command, context, job) for the command router/runner.
+
+        The runner passes `context` = memory + the matched skill's instructions, so
+        we fold it into the prompt — this is how an imported skill actually steers
+        the model (works with any provider; nothing is vendor-specific)."""
         def _agent(command: str, context: str, job: object) -> str:
             try:
                 job.add_step("action", f"Calling {self.name} for a completion.")  # type: ignore[attr-defined]
             except Exception:  # noqa: BLE001 - job may be a stub in tests
                 pass
-            return self.complete(command)
+            prompt = command
+            if context and context.strip():
+                prompt = ("Use the following context (your memory and any matched "
+                          f"skill) where relevant.\n\n{context}\n\n---\nTask: {command}")
+            return self.complete(prompt)
         return _agent
 
 

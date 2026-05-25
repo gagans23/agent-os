@@ -21,7 +21,7 @@ from agent_os.agent_memory import AgentMemory
 from agent_os.command_router import CommandRouter
 from agent_os.jobs import JobStore
 from agent_os.runner import run_job
-from agent_os.skill_registry import SkillRegistry
+from agent_os.skill_registry import SkillRegistry, skill_roots_from_env
 from agent_os.trace_recorder import JobRecorder, TraceRecorder
 
 
@@ -50,7 +50,7 @@ def _command_agent(cmd: list[str]):
 
 def _cmd_run(args: argparse.Namespace) -> int:
     memory = AgentMemory(args.state_dir)
-    skills = SkillRegistry(args.skills_dir)
+    skills = SkillRegistry(skill_roots_from_env(args.skills_dir))
     recorder = TraceRecorder(args.traces_dir)
     jobs = JobStore(f"{args.state_dir}/jobs.db")
     agent_fn = _command_agent(shlex.split(args.agent_cmd)) if args.agent_cmd else _demo_agent
@@ -116,7 +116,7 @@ def _cmd_router(args: argparse.Namespace) -> int:
     router = CommandRouter(
         jobs=JobStore(f"{args.state_dir}/jobs.db"),
         memory=AgentMemory(args.state_dir),
-        skills=SkillRegistry(args.skills_dir),
+        skills=SkillRegistry(skill_roots_from_env(args.skills_dir)),
         recorder=TraceRecorder(args.traces_dir),
         suite_path=args.suite,
     )
@@ -137,14 +137,17 @@ def _cmd_ui(args: argparse.Namespace) -> int:
 
 
 def _cmd_skills(args: argparse.Namespace) -> int:
-    reg = SkillRegistry(args.skills_dir)
+    reg = SkillRegistry(skill_roots_from_env(args.skills_dir))
     skills = reg.all()
     if not skills:
         print(f"No skills found in {args.skills_dir}/")
         return 0
+    print(f"{len(skills)} skill(s) across {len(reg.roots)} root(s):")
     for s in skills:
         print(f"- {s.name}: {s.description}")
         print(f"    triggers: {', '.join(s.triggers)}")
+        if s.allowed_tools:
+            print(f"    allowed-tools: {', '.join(s.allowed_tools)}")
     return 0
 
 

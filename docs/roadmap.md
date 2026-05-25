@@ -24,10 +24,11 @@ plugged in (even Onyx itself); the core stays local-first so a child can run it.
 | 1 | **The Brain** 🧠 | self-aware context (your notes/files) | ✅ `context.py` ingest→retrieve, `/learn` `/ask`, grounded + scored (Ahaan-maths demo) |
 | 2 | **Model onboarding** | plug Claude/OpenAI/Ollama/Replit | ✅ `providers.py` — Ollama-first, stdlib HTTP (no SDK), one env var (`AGENT_OS_PROVIDER`); powers reasoner/embedder/agent_fn; hybrid semantic search in the Brain; `/model` |
 | 3 | **Easy install + UI** | "click a button"; non-technical install | ✅ `install.sh` one-command (local venv, no sudo) + `webui.py` minimal local web UI (`agent-os ui`, stdlib, localhost) over the same governed router |
-| 4 | **Pro-coder + connectors** | augment coders; ingest more sources | later — Claude Code/Cursor/Aider links, Onyx/MCP bridge, Understand-Anything graph import, **Agent Skills** import, **knowledge-work plugin** bundles |
+| 4 | **Pro-coder + connectors** | augment coders; ingest more sources | 🚧 in progress — ✅ **Agent Skills** compatibility (`SKILL.md` spec, recursive/multi-root import via `AGENT_OS_SKILLS_PATH`, model-agnostic injection); next: MCP connector bridge, **knowledge-work** role packs, Understand-Anything graph import, Claude Code/Cursor/Aider links |
 | 5 | **Watchers + dashboards** | monitor your computer/thinking | later — folder/event watchers, trend dashboards, **knowledge-graph view of the Brain** |
 
 The deep dives: [the Brain](brain.md) · [model onboarding](providers.md) ·
+[skills & Agent Skills](skills.md) · [install + UI](install-and-ui.md) ·
 [cross-episode insights](insights.md) · [architecture](architecture.md).
 
 ## Planned integrations

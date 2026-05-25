@@ -202,13 +202,13 @@ def serve(host: str = "127.0.0.1", port: int = 8765, *, router=None,
         from agent_os.agent_memory import AgentMemory
         from agent_os.command_router import CommandRouter
         from agent_os.jobs import JobStore
-        from agent_os.skill_registry import SkillRegistry
+        from agent_os.skill_registry import SkillRegistry, skill_roots_from_env
         from agent_os.trace_recorder import TraceRecorder
 
         router = CommandRouter(
             jobs=JobStore(f"{state_dir}/jobs.db"),
             memory=AgentMemory(state_dir),
-            skills=SkillRegistry(skills_dir),
+            skills=SkillRegistry(skill_roots_from_env(skills_dir)),
             recorder=TraceRecorder(traces_dir),
             suite_path=suite,
         )

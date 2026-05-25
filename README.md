@@ -20,10 +20,10 @@ flowchart LR
 📐 **Full diagrams & module map:** [docs/architecture.md](docs/architecture.md) ·
 🗺️ **Modular roadmap (toward a personal agent OS):** [docs/roadmap.md](docs/roadmap.md)
 
-> Status: **v0.8 — one-command install + a local web UI 🖥️**, on top of model
-> onboarding 🧩 (Ollama/OpenAI/Claude), the Brain 🧠, and a tamper-evident
-> governance spine. The three levels (Core · Reliability · Controlled Autonomy)
-> are working and tested; install in one command and click a button. Live
+> Status: **v0.9 — Agent Skills compatibility 🧩** (import the open skill
+> ecosystem), on top of a one-command install + local web UI 🖥️, model onboarding
+> (Ollama/OpenAI/Claude), the Brain 🧠, and a tamper-evident governance spine. The
+> three levels (Core · Reliability · Controlled Autonomy) work and are tested. Live
 > integrations (WhatsApp/Meta, Gmail, Cloudflare Tunnel, GitHub publish) are
 > pluggable adapters you wire with your own credentials — none are bundled or faked.
 
@@ -163,6 +163,25 @@ python examples/provider_demo.py           # offline walkthrough of all three ro
 
 📐 **Deep dive (the three roles, every provider, OpenAI-compatible endpoints, the
 opt-in wiring):** [docs/providers.md](docs/providers.md)
+
+## Skills, incl. Agent Skills 🧩 — bring the open ecosystem (v0.9)
+
+Skills are reusable `SKILL.md` procedures the agent matches and follows. agent-os
+speaks both its own format **and** the open [Agent Skills](https://agentskills.io)
+standard ([`anthropics/skills`](https://github.com/anthropics/skills), the
+[knowledge-work plugins](https://github.com/anthropics/knowledge-work-plugins)), so
+you can import the open ecosystem with no code:
+
+```bash
+git clone https://github.com/anthropics/skills
+export AGENT_OS_SKILLS_PATH="$PWD/skills/skills"   # recursive, multi-root
+agent-os cmd "/skills"                              # your skills + imported ones
+```
+
+A matched skill is injected into the prompt sent to **your** model — set
+`AGENT_OS_PROVIDER=ollama:llama3` to run it locally and free. **Nothing is
+hardwired to one vendor**, and privileged tasks still pass the risk gate, the audit
+log, and the Ninja Harness score. 📐 [docs/skills.md](docs/skills.md)
 
 ## Trust & Governance — tamper-evident by default (v0.6)
 

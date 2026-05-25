@@ -62,6 +62,32 @@ def test_adapters_match_expected_signatures() -> None:
     assert len(p.as_embedder()(["a", "b"])) == 2
 
 
+def test_as_agent_fn_folds_context_into_prompt() -> None:
+    # A matched skill's instructions reach the model (not hardwired to any vendor).
+    from agent_os.providers import Provider
+
+    captured: dict = {}
+
+    class Capture(Provider):
+        name = "capture"
+
+        def complete(self, prompt, *, system=None):
+            captured["prompt"] = prompt
+            return "ok"
+
+        def embed(self, texts):
+            return [[0.0] for _ in texts]
+
+    class _Job:
+        def add_step(self, *a, **k):
+            pass
+
+    out = Capture().as_agent_fn()("research X", "## Matched skill: browser-research\nOpen pages", _Job())
+    assert out == "ok"
+    assert "research X" in captured["prompt"]
+    assert "browser-research" in captured["prompt"]  # skill context was injected
+
+
 # --- ollama (mocked transport) ----------------------------------------------
 
 def test_ollama_complete_and_embed(monkeypatch) -> None:
