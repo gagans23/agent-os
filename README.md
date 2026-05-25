@@ -99,6 +99,15 @@ ctx.ingest_file("ahaan_maths_notes.md")
 print(ctx.build_context("how do I add fractions?"))   # → grounded, source-tagged
 ```
 
+Run the keystone demo, and read the deep dive:
+
+```bash
+python examples/ahaan_maths_demo.py        # ingest notes → grounded, scored answers
+```
+
+📐 **Deep dive (chunking, BM25-lite, hybrid semantic search, the grounding/scoring
+loop, the graph roadmap):** [docs/brain.md](docs/brain.md)
+
 ## Plug in your model 🧩 — Ollama / OpenAI / Claude (v0.7)
 
 agent-os ships **no model and no keys**. You plug in your own with **one
@@ -128,6 +137,13 @@ p = get_provider("ollama:llama3")          # or provider_from_env() to read the 
 answer = p.complete("Explain adding fractions to a 10-year-old.")
 vectors = p.embed(["add fractions", "multiply fractions"])
 ```
+
+```bash
+python examples/provider_demo.py           # offline walkthrough of all three roles
+```
+
+📐 **Deep dive (the three roles, every provider, OpenAI-compatible endpoints, the
+opt-in wiring):** [docs/providers.md](docs/providers.md)
 
 ## Trust & Governance — tamper-evident by default (v0.6)
 

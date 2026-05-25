@@ -24,8 +24,32 @@ plugged in (even Onyx itself); the core stays local-first so a child can run it.
 | 1 | **The Brain** 🧠 | self-aware context (your notes/files) | ✅ `context.py` ingest→retrieve, `/learn` `/ask`, grounded + scored (Ahaan-maths demo) |
 | 2 | **Model onboarding** | plug Claude/OpenAI/Ollama/Replit | ✅ `providers.py` — Ollama-first, stdlib HTTP (no SDK), one env var (`AGENT_OS_PROVIDER`); powers reasoner/embedder/agent_fn; hybrid semantic search in the Brain; `/model` |
 | 3 | **Easy install + UI** | "click a button"; non-technical install | next — one-command installer + minimal local web UI |
-| 4 | **Pro-coder + connectors** | augment coders; ingest more sources | later — Claude Code/Cursor/Aider links, Onyx/MCP bridge |
-| 5 | **Watchers + dashboards** | monitor your computer/thinking | later — folder/event watchers, trend dashboards |
+| 4 | **Pro-coder + connectors** | augment coders; ingest more sources | later — Claude Code/Cursor/Aider links, Onyx/MCP bridge, Understand-Anything graph import |
+| 5 | **Watchers + dashboards** | monitor your computer/thinking | later — folder/event watchers, trend dashboards, **knowledge-graph view of the Brain** |
+
+The deep dives: [the Brain](brain.md) · [model onboarding](providers.md) ·
+[cross-episode insights](insights.md) · [architecture](architecture.md).
+
+## Planned integrations
+
+We don't reinvent what great open tools already do — we **mix them in** behind the
+agent-os spine (traced → scored → gated), keeping the core local-first.
+
+- **[Understand-Anything](https://github.com/Lum1104/Understand-Anything)** (MIT) —
+  a Claude Code plugin that turns any codebase/knowledge base/docs into an
+  **interactive knowledge graph** (multi-agent pipeline → files/functions/concepts
+  as nodes + relationships; guided tours, fuzzy + semantic search, diff-impact
+  analysis, a visual dashboard). This is the natural **graph + visual view of the
+  Brain** — the evolution from flat chunks (Module 1) to a navigable concept graph.
+  Plan: (a) **import** its `.understand-anything/knowledge-graph.json` into the
+  Brain so a codebase's structure becomes part of your personal context; (b) build
+  a **graph layer over the Brain** (entities/edges/communities) inspired by it;
+  (c) surface that graph in the local UI (Module 3) and dashboards (Module 5).
+  For Ahaan, his maths notes become a navigable map of concepts, not just search
+  hits. *Use when Modules 3–5 land.*
+- **[Onyx](https://github.com/onyx-dot-app/onyx)** — heavy agentic RAG over 50+
+  connectors, pluggable as a retrieval backend behind the Brain when a user wants
+  enterprise breadth (Module 4).
 
 ## Principles
 
@@ -35,3 +59,5 @@ plugged in (even Onyx itself); the core stays local-first so a child can run it.
 - **Default-deny autonomy.** Read-only auto-runs; anything ambiguous or that
   writes/sends/deploys needs human approval.
 - **Everything leaves a trace, a score, and an improvement.** That's how it compounds.
+- **Mix in the best, don't reinvent.** Stand on great open tools (Understand-Anything,
+  Onyx, Ollama) behind the orchestration + evaluation spine, instead of rebuilding them.
