@@ -25,6 +25,7 @@ messages, write files, and deploy. The controls that keep that safe:
 | Crash / DoS | Process **supervisor** with bounded restarts + backoff; **timeouts** on subprocess calls; SQLite **WAL + busy_timeout**. |
 | Silent quality regression | Every action is **scored by Ninja Harness**; weak runs are flagged and produce a propose-only improvement (never auto-applied). |
 | Handler errors leaking internals | Router **error boundary** returns a friendly message and audits the error — no stack traces to the user. |
+| Web UI exposure | `agent-os ui` binds to **127.0.0.1** (localhost) with **no built-in auth**; it drives the same governed router (audit + risk gating still apply). Do not bind it to a public address without your own auth/TLS in front. |
 
 ## Known limitations (be aware)
 

@@ -20,12 +20,12 @@ flowchart LR
 📐 **Full diagrams & module map:** [docs/architecture.md](docs/architecture.md) ·
 🗺️ **Modular roadmap (toward a personal agent OS):** [docs/roadmap.md](docs/roadmap.md)
 
-> Status: **v0.7 — model onboarding 🧩 (Ollama/OpenAI/Claude) on top of the Brain 🧠
-> and a tamper-evident governance spine.** The three levels (Core · Reliability ·
-> Controlled Autonomy) are working and tested; plug in any model with one env var,
-> Ollama-first so it runs locally and free. Live integrations (WhatsApp/Meta,
-> Gmail, Cloudflare Tunnel, GitHub publish) are pluggable adapters you wire with
-> your own credentials — none are bundled or faked.
+> Status: **v0.8 — one-command install + a local web UI 🖥️**, on top of model
+> onboarding 🧩 (Ollama/OpenAI/Claude), the Brain 🧠, and a tamper-evident
+> governance spine. The three levels (Core · Reliability · Controlled Autonomy)
+> are working and tested; install in one command and click a button. Live
+> integrations (WhatsApp/Meta, Gmail, Cloudflare Tunnel, GitHub publish) are
+> pluggable adapters you wire with your own credentials — none are bundled or faked.
 
 ### Where this sits vs. Onyx
 
@@ -39,12 +39,31 @@ stays local-first (SQLite + stdlib) so a non-technical person can run it.
 
 ## Install
 
-Requires Python 3.11+ and a local Ninja Harness checkout (until it's on PyPI):
+**One command** (creates a local `.venv`, installs the eval gate + agent-os, no sudo):
 
 ```bash
-pip install -e ../ninja-harness    # the eval gate
-pip install -e ".[dev]"            # agent-os
+curl -fsSL https://raw.githubusercontent.com/gagans23/agent-os/main/install.sh | bash
+# or, from a clone:  ./install.sh
 ```
+
+<details><summary>Manual install (Python 3.11+)</summary>
+
+```bash
+pip install "ninja-harness @ git+https://github.com/gagans23/ninja-harness.git"  # eval gate
+pip install -e ".[dev]"                                                          # agent-os
+```
+</details>
+
+## Run it: the web UI 🖥️ ("click a button")
+
+```bash
+agent-os ui          # opens http://127.0.0.1:8765 in your browser
+```
+
+A single local page (stdlib server — nothing extra to install, **localhost-only**)
+to teach the brain, ask it questions, run tasks, and approve actions — driving the
+**same governed command router** as the CLI, so every action is still traced,
+scored, audited, and risk-gated. 📐 [docs/install-and-ui.md](docs/install-and-ui.md)
 
 ## Try the loop (no external services)
 

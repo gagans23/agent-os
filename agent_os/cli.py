@@ -126,6 +126,16 @@ def _cmd_router(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_ui(args: argparse.Namespace) -> int:
+    """Launch the local web UI (the 'click a button' surface)."""
+    from agent_os.webui import serve
+
+    serve(host=args.host, port=args.port, state_dir=args.state_dir,
+          skills_dir=args.skills_dir, traces_dir=args.traces_dir, suite=args.suite,
+          open_browser=not args.no_browser)
+    return 0
+
+
 def _cmd_skills(args: argparse.Namespace) -> int:
     reg = SkillRegistry(args.skills_dir)
     skills = reg.all()
@@ -182,6 +192,16 @@ def main(argv: list[str] | None = None) -> int:
     p_cmd.add_argument("--traces-dir", default="traces")
     p_cmd.add_argument("--suite", default=None, help="Ninja Harness suite path for /eval.")
     p_cmd.set_defaults(func=_cmd_router)
+
+    p_ui = sub.add_parser("ui", help="Launch the local web UI (click a button).")
+    p_ui.add_argument("--host", default="127.0.0.1", help="Bind address (localhost by default).")
+    p_ui.add_argument("--port", type=int, default=8765)
+    p_ui.add_argument("--state-dir", default="agent_state")
+    p_ui.add_argument("--skills-dir", default="skills")
+    p_ui.add_argument("--traces-dir", default="traces")
+    p_ui.add_argument("--suite", default=None, help="Ninja Harness suite path for /eval.")
+    p_ui.add_argument("--no-browser", action="store_true", help="Don't auto-open a browser.")
+    p_ui.set_defaults(func=_cmd_ui)
 
     p_hp = sub.add_parser("health", help="Run health checks.")
     p_hp.add_argument("--state-dir", default="agent_state")
