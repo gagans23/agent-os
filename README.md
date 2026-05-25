@@ -332,6 +332,13 @@ agent-os cmd "/reject <id>"                 # cancel it
 > Live integrations (WhatsApp/Meta, Gmail, Cloudflare) are pluggable adapters you
 > wire with your own credentials — none are bundled or faked.
 
+## Contributing
+
+PRs welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for setup and the workflow,
+and **[docs/code-review.md](docs/code-review.md)** for how we review — small
+self-contained changes, tests in the same change, and descriptions that say *what*
+and *why* (adapted from [Google's engineering practices](https://github.com/google/eng-practices)).
+
 ## License
 
 Apache-2.0.
