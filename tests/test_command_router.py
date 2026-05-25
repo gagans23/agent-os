@@ -172,3 +172,30 @@ def test_pending_lists(router) -> None:
 
 def test_approve_unknown(router) -> None:
     assert "No approval found" in router.handle("/approve zzzz")
+
+
+# --- Module 2: model onboarding --------------------------------------------
+
+def test_model_command_deterministic_by_default(router) -> None:
+    out = router.handle("/model")
+    assert "deterministic mode" in out
+    assert "AGENT_OS_PROVIDER" in out
+
+
+def test_model_command_with_provider(tmp_path) -> None:
+    from agent_os.providers import EchoProvider
+
+    r = CommandRouter(
+        jobs=JobStore(tmp_path / "jobs.db"),
+        memory=AgentMemory(tmp_path / "state"),
+        skills=SkillRegistry("skills"),
+        recorder=TraceRecorder(tmp_path / "traces"),
+        provider=EchoProvider(),
+    )
+    try:
+        assert "echo" in r.handle("/model")
+        # A configured provider powers the Brain: learned chunks get embedded.
+        r.handle("/learn fractions add the numerators when denominators match")
+        assert r.context.stats()["embeddings"] >= 1
+    finally:
+        r.close()

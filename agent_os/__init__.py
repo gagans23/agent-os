@@ -10,7 +10,7 @@ Gmail, Cloudflare Tunnel) are pluggable adapters you wire with your own
 credentials — none are bundled or faked.
 """
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 from agent_os.agent_memory import AgentMemory
 from agent_os.approvals import ApprovalStore
@@ -26,6 +26,16 @@ from agent_os.insights import (
 )
 from agent_os.jobs import JobStore
 from agent_os.profiles import PROFILES, AgentProfile, get_profile
+from agent_os.providers import (
+    AnthropicProvider,
+    EchoProvider,
+    OllamaProvider,
+    OpenAIProvider,
+    Provider,
+    ProviderError,
+    get_provider,
+    provider_from_env,
+)
 from agent_os.reasoners import LLMReasoner
 from agent_os.risk import RiskAssessment, RiskLevel, classify_risk
 from agent_os.runner import JobResult, run_job
@@ -35,12 +45,14 @@ from agent_os.trace_recorder import JobRecorder, TraceRecorder
 __all__ = [
     "AgentMemory",
     "AgentProfile",
+    "AnthropicProvider",
     "ApprovalStore",
     "AuditLog",
     "CommandRouter",
     "ContextStore",
     "CrossEpisodeSynthesizer",
     "Digest",
+    "EchoProvider",
     "EpisodeSummary",
     "ImprovementProposal",
     "Insight",
@@ -48,7 +60,11 @@ __all__ = [
     "LLMReasoner",
     "JobResult",
     "JobStore",
+    "OllamaProvider",
+    "OpenAIProvider",
     "PROFILES",
+    "Provider",
+    "ProviderError",
     "RiskAssessment",
     "RiskLevel",
     "Skill",
@@ -57,6 +73,8 @@ __all__ = [
     "__version__",
     "classify_risk",
     "get_profile",
+    "get_provider",
     "propose_improvement",
+    "provider_from_env",
     "run_job",
 ]

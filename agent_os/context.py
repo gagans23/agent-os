@@ -18,6 +18,7 @@ Harness as grounding references, so answers can be scored against the source.
 
 from __future__ import annotations
 
+import json
 import math
 import re
 import sqlite3
@@ -85,6 +86,9 @@ class ContextStore:
                 chunk_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 doc_id INTEGER, ordinal INTEGER, text TEXT, source TEXT
             );
+            CREATE TABLE IF NOT EXISTS embeddings (
+                chunk_id INTEGER PRIMARY KEY, vec TEXT
+            );
             """
         )
         self._db.commit()
@@ -100,13 +104,30 @@ class ContextStore:
             (source, title or source, now),
         )
         doc_id = cur.lastrowid
+        new: list[tuple[int, str]] = []
         for i, ch in enumerate(chunk_text(text, chunk_size)):
-            self._db.execute(
+            c = self._db.execute(
                 "INSERT INTO chunks(doc_id,ordinal,text,source) VALUES(?,?,?,?)",
                 (doc_id, i, ch, source),
             )
+            new.append((c.lastrowid, ch))
         self._db.commit()
+        self._embed_chunks(new)
         return doc_id
+
+    def _embed_chunks(self, chunks: list[tuple[int, str]]) -> None:
+        """Compute and persist embeddings for new chunks (only if an embedder is
+        configured). Failures degrade gracefully to keyword-only search."""
+        if not self.embedder or not chunks:
+            return
+        try:
+            vecs = self.embedder([c[1] for c in chunks])
+        except Exception:  # noqa: BLE001 - never let a model hiccup block ingestion
+            return
+        for (cid, _text), vec in zip(chunks, vecs):
+            self._db.execute("INSERT OR REPLACE INTO embeddings(chunk_id,vec) VALUES(?,?)",
+                             (cid, json.dumps([float(x) for x in vec])))
+        self._db.commit()
 
     def ingest_file(self, path: str | Path, chunk_size: int = 800) -> int:
         p = Path(path)
@@ -120,15 +141,8 @@ class ContextStore:
     def _all_chunks(self) -> list[sqlite3.Row]:
         return self._db.execute("SELECT chunk_id,doc_id,source,text FROM chunks").fetchall()
 
-    def search(self, query: str, k: int = 5) -> list[Chunk]:
-        """BM25-lite keyword retrieval (no model needed)."""
-        rows = self._all_chunks()
-        if not rows:
-            return []
-        q_terms = _tokens(query)
-        if not q_terms:
-            return []
-        # Document frequency for idf.
+    def _bm25(self, rows: list[sqlite3.Row], q_terms: list[str]) -> dict[int, float]:
+        """BM25-lite keyword score per chunk_id (no model needed)."""
         n = len(rows)
         df: Counter[str] = Counter()
         toks_per_chunk = []
@@ -139,7 +153,7 @@ class ContextStore:
                 df[t] += 1
         avg_len = sum(len(t) for t in toks_per_chunk) / n or 1.0
         k1, b = 1.5, 0.75
-        scored: list[Chunk] = []
+        out: dict[int, float] = {}
         for r, toks in zip(rows, toks_per_chunk):
             tf = Counter(toks)
             dl = len(toks) or 1
@@ -152,7 +166,67 @@ class ContextStore:
                 den = tf[term] + k1 * (1 - b + b * dl / avg_len)
                 score += idf * num / den
             if score > 0:
-                scored.append(Chunk(r["chunk_id"], r["doc_id"], r["source"], r["text"], round(score, 4)))
+                out[r["chunk_id"]] = score
+        return out
+
+    def _semantic(self, query: str) -> dict[int, float]:
+        """Cosine similarity per chunk_id against the query embedding.
+
+        Returns {} when no embedder is configured, none are stored, or the model
+        call fails — so search always degrades cleanly to keyword-only."""
+        if not self.embedder:
+            return {}
+        stored = self._db.execute("SELECT chunk_id, vec FROM embeddings").fetchall()
+        if not stored:
+            return {}
+        try:
+            qvec = self.embedder([query])[0]
+        except Exception:  # noqa: BLE001 - degrade to keyword-only
+            return {}
+        qn = math.sqrt(sum(x * x for x in qvec)) or 1.0
+        out: dict[int, float] = {}
+        for row in stored:
+            vec = json.loads(row["vec"])
+            if len(vec) != len(qvec):
+                continue
+            dot = sum(a * b for a, b in zip(qvec, vec))
+            vn = math.sqrt(sum(x * x for x in vec)) or 1.0
+            out[row["chunk_id"]] = dot / (qn * vn)
+        return out
+
+    def search(self, query: str, k: int = 5, alpha: float = 0.5) -> list[Chunk]:
+        """Retrieve the top-k chunks.
+
+        Keyword-only (BM25-lite) by default. When a `embedder` is configured and
+        embeddings exist, blends keyword and semantic scores (both min-max
+        normalized) as ``alpha*semantic + (1-alpha)*keyword`` — a hybrid that
+        catches paraphrases keyword search misses while keeping exact hits."""
+        rows = self._all_chunks()
+        if not rows:
+            return []
+        q_terms = _tokens(query)
+        bm = self._bm25(rows, q_terms) if q_terms else {}
+        sem = self._semantic(query)
+        if not bm and not sem:
+            return []
+
+        def _norm(d: dict[int, float]) -> dict[int, float]:
+            if not d:
+                return {}
+            lo, hi = min(d.values()), max(d.values())
+            rng = (hi - lo) or 1.0
+            return {cid: (v - lo) / rng for cid, v in d.items()}
+
+        bmn, semn = _norm(bm), _norm(sem)
+        # Blend only when both signals exist; otherwise use whichever we have.
+        if bmn and semn:
+            combined = {cid: alpha * semn.get(cid, 0.0) + (1 - alpha) * bmn.get(cid, 0.0)
+                        for cid in set(bmn) | set(semn)}
+        else:
+            combined = semn or bmn
+        by_id = {r["chunk_id"]: r for r in rows}
+        scored = [Chunk(r["chunk_id"], r["doc_id"], r["source"], r["text"], round(combined[cid], 4))
+                  for cid, r in ((c, by_id[c]) for c in combined)]
         scored.sort(key=lambda c: -c.score)
         return scored[:k]
 
@@ -172,10 +246,25 @@ class ContextStore:
         """Top chunks as a list of references for Ninja Harness grounding."""
         return [c.text.strip() for c in self.search(query, k)]
 
+    def reindex_embeddings(self) -> int:
+        """Embed any chunks that don't yet have an embedding (e.g. after wiring a
+        provider to a store that was populated in keyword-only mode). Returns the
+        number of chunks embedded. No-op without an embedder."""
+        if not self.embedder:
+            return 0
+        rows = self._db.execute(
+            "SELECT c.chunk_id, c.text FROM chunks c "
+            "LEFT JOIN embeddings e ON e.chunk_id=c.chunk_id WHERE e.chunk_id IS NULL"
+        ).fetchall()
+        pending = [(r["chunk_id"], r["text"]) for r in rows]
+        self._embed_chunks(pending)
+        return len(pending)
+
     def stats(self) -> dict[str, int]:
         d = self._db.execute("SELECT COUNT(*) c FROM docs").fetchone()["c"]
         c = self._db.execute("SELECT COUNT(*) c FROM chunks").fetchone()["c"]
-        return {"docs": d, "chunks": c}
+        e = self._db.execute("SELECT COUNT(*) c FROM embeddings").fetchone()["c"]
+        return {"docs": d, "chunks": c, "embeddings": e}
 
     def close(self) -> None:
         self._db.close()

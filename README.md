@@ -20,12 +20,12 @@ flowchart LR
 📐 **Full diagrams & module map:** [docs/architecture.md](docs/architecture.md) ·
 🗺️ **Modular roadmap (toward a personal agent OS):** [docs/roadmap.md](docs/roadmap.md)
 
-> Status: **v0.6 — Trust & Governance hardened + the Brain 🧠 shipped.** The three
-> levels (Core · Reliability · Controlled Autonomy) are working and tested, now on
-> a tamper-evident, default-deny governance spine plus a local-first personal
-> knowledge base. Live integrations (WhatsApp/Meta, Gmail, Cloudflare Tunnel,
-> GitHub publish) are pluggable adapters you wire with your own credentials —
-> none are bundled or faked.
+> Status: **v0.7 — model onboarding 🧩 (Ollama/OpenAI/Claude) on top of the Brain 🧠
+> and a tamper-evident governance spine.** The three levels (Core · Reliability ·
+> Controlled Autonomy) are working and tested; plug in any model with one env var,
+> Ollama-first so it runs locally and free. Live integrations (WhatsApp/Meta,
+> Gmail, Cloudflare Tunnel, GitHub publish) are pluggable adapters you wire with
+> your own credentials — none are bundled or faked.
 
 ### Where this sits vs. Onyx
 
@@ -97,6 +97,36 @@ from agent_os.context import ContextStore
 ctx = ContextStore()                       # or ContextStore(embedder=my_embedder)
 ctx.ingest_file("ahaan_maths_notes.md")
 print(ctx.build_context("how do I add fractions?"))   # → grounded, source-tagged
+```
+
+## Plug in your model 🧩 — Ollama / OpenAI / Claude (v0.7)
+
+agent-os ships **no model and no keys**. You plug in your own with **one
+environment variable** — and it stays **Ollama-first** so a non-technical user
+runs everything **locally, for free, with no account**:
+
+```bash
+export AGENT_OS_PROVIDER="ollama:llama3"                       # local + free, no key
+export AGENT_OS_PROVIDER="openai:gpt-4o-mini"                  # needs OPENAI_API_KEY
+export AGENT_OS_PROVIDER="anthropic:claude-3-5-sonnet-20241022" # needs ANTHROPIC_API_KEY
+agent-os cmd "/model"                                          # show what's wired
+```
+
+One small adapter (`providers.py`, **standard-library HTTP — no SDK**) powers three
+roles at once: **reasoner** (the `/ask` answer, the `/digest` prose), **embedder**
+(semantic search in the Brain — `/ask` becomes hybrid keyword + meaning), and the
+**agent_fn** behind `/run`. Any OpenAI-compatible endpoint (Together, vLLM, LM
+Studio, Replit's proxy) works via `openai:<model>` + `OPENAI_BASE_URL`.
+
+With **nothing configured**, agent-os stays in **deterministic mode and makes no
+model calls** — every external call is opt-in and uses *your* credentials. No
+bundled keys, no hidden network calls.
+
+```python
+from agent_os.providers import get_provider, provider_from_env
+p = get_provider("ollama:llama3")          # or provider_from_env() to read the env
+answer = p.complete("Explain adding fractions to a 10-year-old.")
+vectors = p.embed(["add fractions", "multiply fractions"])
 ```
 
 ## Trust & Governance — tamper-evident by default (v0.6)
@@ -206,6 +236,7 @@ agent-os cmd "/browser-demo"    # run the demo agent end-to-end
 agent-os cmd "/learn <path|text>" # ingest notes/files into the brain
 agent-os cmd "/ask <question>"  # answer from your knowledge base (grounded + scored)
 agent-os cmd "/audit"           # recent audit entries + chain integrity
+agent-os cmd "/model"           # show the configured model provider
 agent-os cmd "/job f6df6f7d"    # show a persisted job (id or short prefix)
 agent-os cmd "/trace f6df6f7d"  # show a job's trajectory + score
 ```

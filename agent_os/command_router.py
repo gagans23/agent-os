@@ -81,7 +81,7 @@ class CommandRouter:
                  skills: SkillRegistry | None = None, recorder: TraceRecorder | None = None,
                  approvals=None, agent_fn=None, suite_path: str | None = None,
                  digest_source=None, reasoner=None, digest_lens: str = "founder/investor",
-                 audit=None, context=None) -> None:
+                 audit=None, context=None, provider=None) -> None:
         from agent_os.approvals import ApprovalStore
         from agent_os.audit import AuditLog
         from agent_os.context import ContextStore
@@ -99,6 +99,27 @@ class CommandRouter:
         self.digest_source = digest_source or _demo_episodes
         self.reasoner = reasoner
         self.digest_lens = digest_lens
+        # Model onboarding (opt-in): a provider is used ONLY if you pass one or set
+        # AGENT_OS_PROVIDER. With none configured, agent-os stays deterministic and
+        # makes no model calls. A configured provider powers /ask + /run (agent_fn),
+        # /digest (reasoner), and the Brain's semantic search (embedder).
+        self.provider = provider
+        if self.provider is None:
+            try:
+                from agent_os.providers import provider_from_env
+                self.provider = provider_from_env()
+            except Exception:  # noqa: BLE001 - a bad spec must not break the router
+                self.provider = None
+        if self.provider is not None:
+            if agent_fn is None:
+                self.agent_fn = self.provider.as_agent_fn()
+            if reasoner is None:
+                self.reasoner = self.provider.as_reasoner()
+            try:
+                self.context.embedder = self.provider.as_embedder()
+                self.context.reindex_embeddings()
+            except Exception:  # noqa: BLE001 - embeddings are optional; degrade to keyword
+                pass
 
     # --- dispatch ----------------------------------------------------------
 
@@ -125,6 +146,7 @@ class CommandRouter:
             "learn": self._learn,
             "ask": self._ask,
             "audit": lambda a: self._audit(),
+            "model": lambda a: self._model(),
             "job": self._job,
             "trace": self._trace,
             "run": self._run,
@@ -163,6 +185,7 @@ class CommandRouter:
             "  /learn <path|text>  ingest notes/files into the knowledge base (the brain)\n"
             "  /ask <question>  answer from your knowledge base (grounded + scored)\n"
             "  /audit           recent audit entries + chain integrity\n"
+            "  /model           show the configured model provider\n"
             "  /job <id>        show a job record\n"
             "  /trace <id>      show a job's trace summary\n"
             "  /run <task>      submit a task (auto-runs if read-only; else needs approval)\n"
@@ -336,6 +359,24 @@ class CommandRouter:
         for e in entries:
             lines.append(f"  {e['ts'][11:19]}  {e['command'][:40]:<40}  → {e['decision'][:40]}")
         return "\n".join(lines)
+
+    def _model(self) -> str:
+        if self.provider is None:
+            return (
+                "Model: none configured — deterministic mode (no model calls).\n"
+                "Plug one in (Ollama-first, free & local):\n"
+                "  export AGENT_OS_PROVIDER=ollama:llama3        # local, no key\n"
+                "  export AGENT_OS_PROVIDER=openai:gpt-4o-mini   # needs OPENAI_API_KEY\n"
+                "  export AGENT_OS_PROVIDER=anthropic:claude-3-5-sonnet-20241022\n"
+                "It powers /ask + /run (answers), /digest (synthesis), and the Brain's "
+                "semantic search."
+            )
+        embeds = self.context.stats().get("embeddings", 0)
+        return (
+            f"Model: {self.provider.name}\n"
+            f"  powers: /ask + /run (answers) · /digest (synthesis) · Brain semantic search\n"
+            f"  embedded chunks: {embeds}"
+        )
 
     def _digest(self) -> str:
         """Synthesize a cross-episode digest, score it, and persist it as a job.

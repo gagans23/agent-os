@@ -77,3 +77,31 @@ def test_empty_store_returns_nothing(tmp_path) -> None:
     assert store.search("anything") == []
     assert store.build_context("anything") == ""
     store.close()
+
+
+# --- semantic / hybrid retrieval (with a pluggable embedder) ----------------
+
+def test_embeddings_stored_at_ingest_and_hybrid_search(tmp_path) -> None:
+    from agent_os.providers import EchoProvider
+
+    store = ContextStore(tmp_path / "ctx.db", embedder=EchoProvider().embed)
+    store.ingest_text(NOTES, source="maths-notes")
+    s = store.stats()
+    assert s["embeddings"] == s["chunks"] and s["embeddings"] >= 3
+    # Hybrid search still surfaces the relevant chunk.
+    hits = store.search("how do I add fractions?", k=3)
+    assert hits and "numerator" in hits[0].text.lower()
+    store.close()
+
+
+def test_reindex_embeddings_backfills(tmp_path) -> None:
+    from agent_os.providers import EchoProvider
+
+    # Ingest in keyword-only mode (no embedder), then wire one in and backfill.
+    store = ContextStore(tmp_path / "ctx.db")
+    store.ingest_text(NOTES, source="maths-notes")
+    assert store.stats()["embeddings"] == 0
+    store.embedder = EchoProvider().embed
+    n = store.reindex_embeddings()
+    assert n >= 3 and store.stats()["embeddings"] == n
+    store.close()

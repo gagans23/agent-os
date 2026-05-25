@@ -22,7 +22,7 @@ plugged in (even Onyx itself); the core stays local-first so a child can run it.
 |---|---|---|---|
 | 0 | **Trust & Governance** | track · audit · gate | ✅ memory, jobs, traces, skills, profiles, risk (default-deny + tool-aware), approvals, **tamper-evident audit**, eval gate, reliability/supervisor/health |
 | 1 | **The Brain** 🧠 | self-aware context (your notes/files) | ✅ `context.py` ingest→retrieve, `/learn` `/ask`, grounded + scored (Ahaan-maths demo) |
-| 2 | **Model onboarding** | plug Claude/OpenAI/Ollama/Replit | next — `providers.py` (Ollama-first for free/local), powering reasoner/judge/embedder |
+| 2 | **Model onboarding** | plug Claude/OpenAI/Ollama/Replit | ✅ `providers.py` — Ollama-first, stdlib HTTP (no SDK), one env var (`AGENT_OS_PROVIDER`); powers reasoner/embedder/agent_fn; hybrid semantic search in the Brain; `/model` |
 | 3 | **Easy install + UI** | "click a button"; non-technical install | next — one-command installer + minimal local web UI |
 | 4 | **Pro-coder + connectors** | augment coders; ingest more sources | later — Claude Code/Cursor/Aider links, Onyx/MCP bridge |
 | 5 | **Watchers + dashboards** | monitor your computer/thinking | later — folder/event watchers, trend dashboards |
