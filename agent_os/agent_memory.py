@@ -42,6 +42,8 @@ class AgentMemory:
         self.db_path = self.root / "state.db"
         self._db = sqlite3.connect(self.db_path)
         self._db.row_factory = sqlite3.Row
+        self._db.execute("PRAGMA journal_mode=WAL")
+        self._db.execute("PRAGMA busy_timeout=5000")
         self._init_db()
 
     def _init_db(self) -> None:

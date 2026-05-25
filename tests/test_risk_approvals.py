@@ -39,6 +39,37 @@ def test_assessment_dict() -> None:
     assert d["level"] == "DEPLOY" and d["requires_approval"] is True
 
 
+# --- hardening: default-deny on ambiguity + tool-aware ----------------------
+
+def test_ambiguous_defaults_to_approval() -> None:
+    # No read verb, no risk verb → must NOT auto-run (default-deny).
+    a = classify_risk("do the thing")
+    assert a.ambiguous is True
+    assert a.requires_approval is True
+
+
+def test_destructive_phrasing_without_obvious_verb_is_caught() -> None:
+    # The old keyword matcher missed these → catastrophic auto-run. Now caught.
+    for task in ["make the prod table empty", "purge the cache",
+                 "erase the user records", "wipe the database"]:
+        a = classify_risk(task)
+        assert a.requires_approval is True, task
+
+
+def test_tool_capability_escalates_risk() -> None:
+    # Even an innocuous-sounding task is gated if the agent CAN send/delete.
+    a = classify_risk("handle the user's request", tools=["send_whatsapp", "read_inbox"])
+    assert a.requires_approval is True
+    assert a.via_tools is True
+    assert a.level == RiskLevel.SEND
+
+
+def test_read_only_with_safe_tools_still_auto() -> None:
+    a = classify_risk("summarize the inbox", tools=["read_inbox", "search"])
+    assert a.requires_approval is False
+    assert a.level == RiskLevel.READ_ONLY
+
+
 # --- approval queue ---------------------------------------------------------
 
 def test_enqueue_and_get(tmp_path) -> None:

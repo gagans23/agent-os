@@ -17,12 +17,25 @@ flowchart LR
     X --> T[Trace] --> N[Ninja Harness] --> P["Propose<br/>improvement"] --> Z[Report]
 ```
 
-📐 **Full diagrams & module map:** [docs/architecture.md](docs/architecture.md)
+📐 **Full diagrams & module map:** [docs/architecture.md](docs/architecture.md) ·
+🗺️ **Modular roadmap (toward a personal agent OS):** [docs/roadmap.md](docs/roadmap.md)
 
-> Status: **v0.3 — all three levels shipped.** Core + Reliability + Controlled
-> Autonomy are working and tested. Live integrations (WhatsApp/Meta, Gmail,
-> Cloudflare Tunnel, GitHub publish) are pluggable adapters you wire with your
-> own credentials — none are bundled or faked.
+> Status: **v0.6 — Trust & Governance hardened + the Brain 🧠 shipped.** The three
+> levels (Core · Reliability · Controlled Autonomy) are working and tested, now on
+> a tamper-evident, default-deny governance spine plus a local-first personal
+> knowledge base. Live integrations (WhatsApp/Meta, Gmail, Cloudflare Tunnel,
+> GitHub publish) are pluggable adapters you wire with your own credentials —
+> none are bundled or faked.
+
+### Where this sits vs. Onyx
+
+[Onyx](https://github.com/onyx-dot-app/onyx) is the open-source "application layer
+for LLMs" — excellent agentic **RAG over 50+ connectors**, with a polished UI.
+agent-os is **not** trying to out-connector Onyx. Our layer is the **orchestration
++ evaluation + controlled-autonomy + personal-brain** spine: every agent action is
+**traced → scored by [Ninja Harness](https://github.com/gagans23/ninja-harness) →
+risk-gated → improved**. Heavy RAG can be plugged in (even Onyx itself); the core
+stays local-first (SQLite + stdlib) so a non-technical person can run it.
 
 ## Install
 
@@ -51,6 +64,61 @@ Ninja score: 94.3
 Safety: PASS
 Artifact: traces/<job_id>/final.md
 ```
+
+## The Brain 🧠 — your own context (v0.6)
+
+The keystone of the personal-OS vision: agents that are **self-aware of *your*
+context**. `context.py` is a local-first, dependency-light knowledge base —
+SQLite + BM25-lite retrieval, standard library only, **zero infrastructure**.
+Semantic search is a *pluggable embedder* you supply (Ollama/OpenAI/etc.) — never
+bundled, never a hidden network call.
+
+```bash
+# Ahaan's maths brain: teach it, then ask — grounded in his own notes.
+agent-os cmd "/learn ~/ahaan_maths_notes.md"        # ingest a file
+agent-os cmd "/learn To add fractions with the same denominator, add the numerators."
+agent-os cmd "/ask how do I add fractions?"
+```
+
+```
+Based on your notes:
+[source: note] To add fractions with the same denominator, add the numerators...
+
+[PASS · grounding 0.75 · Job a1b2c3d4]
+```
+
+`/ask` retrieves the top chunks, answers **only from your context**, and hands
+those chunks to **Ninja Harness as grounding references** — so the answer is
+*scored against the source*, and ungrounded answers get flagged. Upload notes,
+files, or whole folders; it becomes the brain every agent retrieves from.
+
+```python
+from agent_os.context import ContextStore
+ctx = ContextStore()                       # or ContextStore(embedder=my_embedder)
+ctx.ingest_file("ahaan_maths_notes.md")
+print(ctx.build_context("how do I add fractions?"))   # → grounded, source-tagged
+```
+
+## Trust & Governance — tamper-evident by default (v0.6)
+
+Every command is recorded into a **hash-chained, tamper-evident audit log**
+(`audit.py`): each entry's hash covers its content *plus the previous hash*, so any
+edit or deletion breaks the chain and is detectable. The risk classifier
+(`risk.py`) is **default-deny** — anything ambiguous, or that writes/sends/deploys,
+is gated for approval — and **tool-aware**, so a task is escalated if the agent
+merely *can* send or delete. A global error boundary means users never see a raw
+stack trace.
+
+```bash
+agent-os cmd "/audit"                       # recent entries + chain integrity
+agent-os cmd "/risk make the prod table empty"   # → WRITE → REQUIRES APPROVAL
+```
+
+```
+Audit log — 12 entries · chain ✅ intact
+```
+
+See [SECURITY.md](SECURITY.md) for the full threat model and known limitations.
 
 ## Cross-episode insights (v0.4)
 
@@ -135,6 +203,9 @@ agent-os cmd "/agents"          # list agent profiles
 agent-os cmd "/skills"          # list skills + triggers
 agent-os cmd "/eval"            # run the Ninja Harness suite (or summarize jobs)
 agent-os cmd "/browser-demo"    # run the demo agent end-to-end
+agent-os cmd "/learn <path|text>" # ingest notes/files into the brain
+agent-os cmd "/ask <question>"  # answer from your knowledge base (grounded + scored)
+agent-os cmd "/audit"           # recent audit entries + chain integrity
 agent-os cmd "/job f6df6f7d"    # show a persisted job (id or short prefix)
 agent-os cmd "/trace f6df6f7d"  # show a job's trajectory + score
 ```

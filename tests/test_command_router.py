@@ -83,6 +83,37 @@ def test_health_command(router) -> None:
     assert "Health:" in out
 
 
+def test_learn_and_ask_brain(router) -> None:
+    out = router.handle("/learn To add fractions with the same denominator, add the numerators. 1/4 + 2/4 = 3/4.")
+    assert "Learned" in out and "chunk" in out
+    answer = router.handle("/ask how do I add fractions")
+    assert "numerator" in answer.lower() or "fraction" in answer.lower()
+
+
+def test_ask_without_knowledge(router) -> None:
+    assert "knowledge base" in router.handle("/ask anything at all").lower()
+
+
+def test_audit_records_every_command_and_chain_intact(router) -> None:
+    router.handle("/ping")
+    router.handle("/skills")
+    out = router.handle("/audit")
+    assert "chain ✅ intact" in out
+    # audit recorded the prior commands (plus this /audit call)
+    assert router.audit.count() >= 3
+
+
+def test_error_boundary_no_stack_trace(router, monkeypatch) -> None:
+    # Force a handler to blow up; the router should return a friendly message.
+    def boom(*a):
+        raise RuntimeError("kaboom")
+    monkeypatch.setattr(router, "_skills", boom)
+    out = router.handle("/skills")
+    assert out.startswith("⚠️") and "kaboom" in out
+    # and it was audited as an error
+    assert any("error" in e["decision"] for e in router.audit.recent())
+
+
 def test_digest_command_runs_and_scores(router) -> None:
     out = router.handle("/digest")
     assert "Cross-episode insights" in out

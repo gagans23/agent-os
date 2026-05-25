@@ -80,14 +80,19 @@ class CommandRouter:
     def __init__(self, *, jobs: JobStore | None = None, memory: AgentMemory | None = None,
                  skills: SkillRegistry | None = None, recorder: TraceRecorder | None = None,
                  approvals=None, agent_fn=None, suite_path: str | None = None,
-                 digest_source=None, reasoner=None, digest_lens: str = "founder/investor") -> None:
+                 digest_source=None, reasoner=None, digest_lens: str = "founder/investor",
+                 audit=None, context=None) -> None:
         from agent_os.approvals import ApprovalStore
+        from agent_os.audit import AuditLog
+        from agent_os.context import ContextStore
 
         self.jobs = jobs or JobStore()
         self.memory = memory or AgentMemory()
         self.skills = skills or SkillRegistry()
         self.recorder = recorder or TraceRecorder()
         self.approvals = approvals or ApprovalStore(Path(self.memory.root) / "approvals.db")
+        self.audit = audit or AuditLog(Path(self.memory.root) / "audit.db")
+        self.context = context or ContextStore(Path(self.memory.root) / "context.db")
         self.agent_fn = agent_fn or _default_agent
         self.suite_path = suite_path
         # Cross-episode digest: supply your feed fetcher + LLM reasoner in production.
@@ -97,7 +102,10 @@ class CommandRouter:
 
     # --- dispatch ----------------------------------------------------------
 
-    def handle(self, text: str) -> str:
+    def handle(self, text: str, actor: str = "local") -> str:
+        """Route a command to its handler. Every command is audited, and a global
+        error boundary turns handler exceptions into a friendly reply (never a
+        raw stack trace to the user)."""
         text = (text or "").strip()
         if not text:
             return self._help()
@@ -114,6 +122,9 @@ class CommandRouter:
             "eval": lambda a: self._eval(),
             "browser-demo": lambda a: self._browser_demo(),
             "digest": lambda a: self._digest(),
+            "learn": self._learn,
+            "ask": self._ask,
+            "audit": lambda a: self._audit(),
             "job": self._job,
             "trace": self._trace,
             "run": self._run,
@@ -123,8 +134,15 @@ class CommandRouter:
             "reject": self._reject,
         }.get(cmd)
         if handler is None:
+            self.audit.record(text, actor=actor, decision="unknown-command")
             return f"Unknown command: /{cmd}\n\n{self._help()}"
-        return handler(args)
+        try:
+            response = handler(args)
+        except Exception as exc:  # noqa: BLE001 - global boundary; never leak a stack trace
+            self.audit.record(text, actor=actor, decision=f"error: {type(exc).__name__}")
+            return f"⚠️ /{cmd} failed: {type(exc).__name__}: {exc}"
+        self.audit.record(text, actor=actor, decision=response.splitlines()[0][:120] if response else "ok")
+        return response
 
     # --- handlers ----------------------------------------------------------
 
@@ -142,6 +160,9 @@ class CommandRouter:
             "  /eval            run the eval suite (Ninja Harness)\n"
             "  /browser-demo    run the demo agent end-to-end\n"
             "  /digest          synthesize a cross-episode insight digest\n"
+            "  /learn <path|text>  ingest notes/files into the knowledge base (the brain)\n"
+            "  /ask <question>  answer from your knowledge base (grounded + scored)\n"
+            "  /audit           recent audit entries + chain integrity\n"
             "  /job <id>        show a job record\n"
             "  /trace <id>      show a job's trace summary\n"
             "  /run <task>      submit a task (auto-runs if read-only; else needs approval)\n"
@@ -253,6 +274,69 @@ class CommandRouter:
         )
         return result.summary + f"\n\nJob: {result.job_id[-8:]}  (try /trace {result.job_id[-8:]})"
 
+    # --- the brain: knowledge base -----------------------------------------
+
+    def _learn(self, args: list[str]) -> str:
+        if not args:
+            return "Usage: /learn <file path | text to remember>"
+        target = " ".join(args)
+        if Path(target).expanduser().exists():
+            doc_id = self.context.ingest_file(Path(target).expanduser())
+            src = Path(target).name
+        else:
+            doc_id = self.context.ingest_text(target, source="note")
+            src = "note"
+        stats = self.context.stats()
+        return (f"🧠 Learned from '{src}' (doc {doc_id}). "
+                f"Knowledge base now has {stats['docs']} doc(s), {stats['chunks']} chunk(s). "
+                f"Ask with /ask <question>.")
+
+    def _ask(self, args: list[str]) -> str:
+        if not args:
+            return "Usage: /ask <question>"
+        question = " ".join(args)
+        ctx = self.context.build_context(question)
+        if not ctx:
+            return "I don't have anything in the knowledge base about that yet. Use /learn first."
+        # Answer using context. With a real LLM agent_fn this becomes a true answer;
+        # the default composes from retrieved context and is scored for grounding.
+        refs = self.context.references(question)
+
+        try:
+            from ninja_harness.schemas import EvaluationCase
+            case = EvaluationCase(task=question, references=refs)
+        except ImportError:
+            case = None
+
+        holder: dict[str, str] = {}
+
+        def _ask_agent(command, context_str, job):
+            job.add_step("observation", f"Retrieved {len(refs)} context chunk(s).")
+            answer = self.agent_fn(f"Answer using ONLY this context:\n{ctx}\n\nQ: {question}",
+                                   context_str, job)
+            # If using the trivial default agent, fall back to the context itself.
+            if not answer or "Handled:" in answer:
+                answer = f"Based on your notes:\n{ctx}"
+            holder["answer"] = answer
+            return answer
+
+        from agent_os.runner import run_job
+        result = run_job(f"ask: {question}", _ask_agent, profile="researcher",
+                         memory=self.memory, skills=self.skills, recorder=self.recorder,
+                         jobs=self.jobs, case=case)
+        g = result.result.metric_by_name("grounding") if result.result else None
+        gtxt = f" · grounding {g.score:.2f}" if g and g.is_applicable else ""
+        return f"{holder['answer']}\n\n[{result.verdict}{gtxt} · Job {result.job_id[-8:]}]"
+
+    def _audit(self) -> str:
+        ok, broken = self.audit.verify()
+        entries = self.audit.recent(limit=8)
+        head = f"Audit log — {self.audit.count()} entries · chain {'✅ intact' if ok else f'❌ BROKEN at seq {broken}'}"
+        lines = [head, ""]
+        for e in entries:
+            lines.append(f"  {e['ts'][11:19]}  {e['command'][:40]:<40}  → {e['decision'][:40]}")
+        return "\n".join(lines)
+
     def _digest(self) -> str:
         """Synthesize a cross-episode digest, score it, and persist it as a job.
         Uses self.digest_source (feed fetcher) + self.reasoner (your LLM)."""
@@ -308,15 +392,15 @@ class CommandRouter:
         if not task:
             return "Usage: /run <task>"
         assessment = classify_risk(task)
+        label = "AMBIGUOUS" if assessment.ambiguous else assessment.level.label
         if not assessment.requires_approval:
             _result, summary = self._execute(task, self._profile_for("READ_ONLY"))
             return f"[risk: READ_ONLY → auto-run]\n{summary}"
         approval_id = self.approvals.enqueue(
-            task, self._profile_for(assessment.level.label),
-            assessment.level.label, assessment.reason,
+            task, self._profile_for(assessment.level.label), label, assessment.reason,
         )
         return (
-            f"⛔ Needs approval — risk: {assessment.level.label} ({assessment.reason}).\n"
+            f"⛔ Needs approval — risk: {label} ({assessment.reason}).\n"
             f"Task: {task}\n"
             f"Approve:  /approve {approval_id}\n"
             f"Reject:   /reject {approval_id}"
@@ -418,3 +502,5 @@ class CommandRouter:
         self.jobs.close()
         self.memory.close()
         self.approvals.close()
+        self.audit.close()
+        self.context.close()
