@@ -22,6 +22,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from agent_os.jobs import _ensure_wal
+
 _MEMORY_SEED = "# Agent Memory\n\nRunning notes the agent has learned. Append-only-ish.\n"
 _USER_SEED = "# User Profile\n\nPreferences and recurring context for this user.\n"
 
@@ -40,12 +42,12 @@ class AgentMemory:
         if not self.user_md.exists():
             self.user_md.write_text(_USER_SEED)
         self.db_path = self.root / "state.db"
-        self._db = sqlite3.connect(self.db_path, timeout=5.0)
+        self._db = sqlite3.connect(self.db_path, timeout=10.0)
         self._db.row_factory = sqlite3.Row
-        # busy_timeout before the WAL switch: concurrent opens (the swarm) wait for
-        # the brief exclusive lock rather than erroring with "database is locked".
-        self._db.execute("PRAGMA busy_timeout=5000")
-        self._db.execute("PRAGMA journal_mode=WAL")
+        # busy_timeout before touching journal mode: concurrent opens (the swarm)
+        # wait for any brief lock rather than erroring with "database is locked".
+        self._db.execute("PRAGMA busy_timeout=10000")
+        _ensure_wal(self._db)
         self._init_db()
 
     def _init_db(self) -> None:

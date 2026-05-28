@@ -18,18 +18,31 @@ from pathlib import Path
 from typing import Any
 
 
+def _ensure_wal(db: sqlite3.Connection) -> None:
+    """Switch a connection to WAL **only if it isn't already** in WAL mode.
+
+    Reading the current mode takes no lock; the mode *switch* does. Under the
+    swarm's many concurrent connections, repeatedly issuing `PRAGMA
+    journal_mode=WAL` could race on that lock ("database is locked"). Once the DB
+    is WAL (the orchestrator pre-initializes it), every worker sees 'wal' and skips
+    the switch entirely. Set `busy_timeout` before calling this."""
+    mode = db.execute("PRAGMA journal_mode").fetchone()
+    if (mode[0] if mode else "").lower() != "wal":
+        db.execute("PRAGMA journal_mode=WAL")
+
+
 class JobStore:
     """Durable store of job records."""
 
     def __init__(self, db_path: str | Path = "agent_state/jobs.db") -> None:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._db = sqlite3.connect(self.db_path, timeout=5.0)
+        self._db = sqlite3.connect(self.db_path, timeout=10.0)
         self._db.row_factory = sqlite3.Row
-        # busy_timeout BEFORE the WAL switch so concurrent opens wait for the brief
-        # exclusive lock instead of erroring (the swarm opens many connections).
-        self._db.execute("PRAGMA busy_timeout=5000")
-        self._db.execute("PRAGMA journal_mode=WAL")
+        # busy_timeout BEFORE touching journal mode so concurrent opens wait for any
+        # brief lock instead of erroring (the swarm opens many connections at once).
+        self._db.execute("PRAGMA busy_timeout=10000")
+        _ensure_wal(self._db)
         self._init_db()
 
     def _init_db(self) -> None:

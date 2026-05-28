@@ -208,11 +208,15 @@ class Orchestrator:
         return out
 
     def _init_shared_db(self) -> None:
-        """Open + close the job store once so WAL mode and the schema exist before
-        many worker connections open it concurrently."""
+        """Open + close the shared stores once so WAL mode and the schema exist
+        before many worker connections open them concurrently. Both the job store
+        (jobs.db) and memory (state.db) must be WAL first, or workers race on the
+        journal-mode switch ("database is locked")."""
+        from agent_os.agent_memory import AgentMemory
         from agent_os.jobs import JobStore
 
         JobStore(self.jobs_db).close()
+        AgentMemory(self.state_dir).close()
 
     def _run_one(self, s: SubTask) -> SubResult:
         # Default-deny: the swarm never auto-executes a privileged sub-task.
