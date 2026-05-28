@@ -82,12 +82,10 @@ python examples/ahaan_maths_demo.py
 - **2 Model onboarding** ✅ — `providers.py`, one env var (`AGENT_OS_PROVIDER`),
   Ollama-first, stdlib HTTP, powers reasoner/embedder/agent_fn; `/model`.
 - **3 Easy install + UI** ✅ — `install.sh` + `webui.py` (`agent-os ui`).
-- **4 Pro-coder + connectors** — next: Claude Code/Cursor/Aider links, Onyx/MCP
-  bridge, **Understand-Anything** knowledge-graph import into the Brain,
-  **Agent Skills** import (align `SKILL.md` with agentskills.io; import
-  anthropics/skills), and **knowledge-work plugin** role bundles
-  (anthropics/knowledge-work-plugins; bridge their `.mcp.json` connectors). See
-  docs/roadmap.md → Planned integrations.
+- **4 Pro-coder + connectors** — 🚧 ✅ open `SKILL.md` compatibility (import via
+  `AGENT_OS_SKILLS_PATH`, recursive/multi-root, model-agnostic injection); next:
+  MCP connector bridge, role packs, knowledge-graph import into the Brain,
+  coding-agent links. See docs/roadmap.md → Planned capabilities.
 - **5 Watchers + dashboards** — later: folder/event watchers, trend dashboards,
   knowledge-graph view of the Brain.
 - **6 The governed swarm** ✅ — `orchestrator.py`: decompose → bounded-parallel

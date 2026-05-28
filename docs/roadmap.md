@@ -7,14 +7,15 @@ install it; a pro coder should be able to augment their work with it.
 
 We build this **bit by bit, as modules** — never boiling the ocean.
 
-## Where agent-os sits vs. Onyx
+## What agent-os is
 
-[Onyx](https://github.com/onyx-dot-app/onyx) is the open-source "application layer
-for LLMs" — excellent agentic **RAG over 50+ connectors**, a polished UI, voice,
-image-gen, multi-LLM. agent-os is **not** trying to out-connector Onyx. Our layer
-is the **orchestration + evaluation + controlled-autonomy + personal-brain** spine:
-every agent action is **traced → scored by [Ninja Harness](https://github.com/gagans23/ninja-harness) → risk-gated → improved**, which Onyx does not do. Heavy RAG can be
-plugged in (even Onyx itself); the core stays local-first so a child can run it.
+agent-os is the **orchestration + evaluation + controlled-autonomy + personal-brain
+spine** for your own agents. It isn't trying to be the biggest pile of connectors or
+the flashiest chat UI; it's the layer that makes every agent action **traced →
+scored by [Ninja Harness](https://github.com/gagans23/ninja-harness) → risk-gated →
+improved**. The core stays **local-first** (SQLite + stdlib) so a non-technical
+person can run it, and heavier retrieval/connectors can be plugged in behind the
+same governed spine.
 
 ## Modules
 
@@ -24,7 +25,7 @@ plugged in (even Onyx itself); the core stays local-first so a child can run it.
 | 1 | **The Brain** 🧠 | self-aware context (your notes/files) | ✅ `context.py` ingest→retrieve, `/learn` `/ask`, grounded + scored (Ahaan-maths demo) |
 | 2 | **Model onboarding** | plug Claude/OpenAI/Ollama/Replit | ✅ `providers.py` — Ollama-first, stdlib HTTP (no SDK), one env var (`AGENT_OS_PROVIDER`); powers reasoner/embedder/agent_fn; hybrid semantic search in the Brain; `/model`; **`agent-os doctor`** hardware-aware model advisor (`doctor.py`) |
 | 3 | **Easy install + UI** | "click a button"; non-technical install | ✅ `install.sh` one-command (local venv, no sudo) + `webui.py` minimal local web UI (`agent-os ui`, stdlib, localhost) over the same governed router |
-| 4 | **Pro-coder + connectors** | augment coders; ingest more sources | 🚧 in progress — ✅ **Agent Skills** compatibility (`SKILL.md` spec, recursive/multi-root import via `AGENT_OS_SKILLS_PATH`, model-agnostic injection); next: MCP connector bridge, **knowledge-work** role packs, Understand-Anything graph import, Claude Code/Cursor/Aider links |
+| 4 | **Pro-coder + connectors** | augment coders; ingest more sources | 🚧 in progress — ✅ open `SKILL.md` compatibility (recursive/multi-root import via `AGENT_OS_SKILLS_PATH`, model-agnostic injection); next: MCP connector bridge, role packs, knowledge-graph import, coding-agent links |
 | 5 | **Watchers + dashboards** | monitor your computer/thinking | later — folder/event watchers, trend dashboards, **knowledge-graph view of the Brain** |
 | 6 | **The governed swarm** 🐝 | parallel scale, under the trust spine | ✅ `orchestrator.py` — decompose → bounded-parallel sub-jobs → synthesize; each sub-task traced + risk-gated (default-deny) + Ninja-scored; local-first, Ollama-testable, honest concurrency; `/swarm`, `agent-os swarm`, UI card. [deep dive](orchestrator.md) |
 
@@ -32,44 +33,23 @@ The deep dives: [the Brain](brain.md) · [model onboarding](providers.md) ·
 [skills & Agent Skills](skills.md) · [install + UI](install-and-ui.md) ·
 [cross-episode insights](insights.md) · [architecture](architecture.md).
 
-## Planned integrations
+## Planned capabilities
 
-We don't reinvent what great open tools already do — we **mix them in** behind the
-agent-os spine (traced → scored → gated), keeping the core local-first.
+We don't reinvent what good open tools already do — we **mix them in** behind the
+agent-os spine (traced → scored → gated), keeping the core local-first. Drawing
+inspiration (not code) from the best open agent systems, the near-term targets are:
 
-- **[Understand-Anything](https://github.com/Lum1104/Understand-Anything)** (MIT) —
-  a Claude Code plugin that turns any codebase/knowledge base/docs into an
-  **interactive knowledge graph** (multi-agent pipeline → files/functions/concepts
-  as nodes + relationships; guided tours, fuzzy + semantic search, diff-impact
-  analysis, a visual dashboard). This is the natural **graph + visual view of the
-  Brain** — the evolution from flat chunks (Module 1) to a navigable concept graph.
-  Plan: (a) **import** its `.understand-anything/knowledge-graph.json` into the
-  Brain so a codebase's structure becomes part of your personal context; (b) build
-  a **graph layer over the Brain** (entities/edges/communities) inspired by it;
-  (c) surface that graph in the local UI (Module 3) and dashboards (Module 5).
-  For Ahaan, his maths notes become a navigable map of concepts, not just search
-  hits. *Use when Modules 3–5 land.*
-- **[Agent Skills](https://github.com/anthropics/skills)** (Apache-2.0; spec at
-  [agentskills.io](https://agentskills.io)) — skills are self-contained `SKILL.md`
-  folders (YAML `name`/`description` + instructions/scripts/resources) Claude loads
-  dynamically. This is the **same shape as agent-os's `skill_registry.py`**
-  (`skills/*/SKILL.md`). Plan: (a) **align our SKILL.md with the Agent Skills spec**
-  so skills are portable in/out of Claude Code/Cowork; (b) **import** the open-source
-  skills (docx/pdf/pptx/xlsx, testing, MCP-gen, …) into our registry, each invoked
-  **through the governed router** (risk-gated, audited, scored). *Use when Module 4
-  lands — strengthens Module 0 skills too.*
-- **[Knowledge-Work Plugins](https://github.com/anthropics/knowledge-work-plugins)** —
-  11 role bundles (productivity, sales, support, PM, marketing, legal, finance,
-  data, enterprise-search, bio-research) for Claude Cowork/Code; each is file-based:
-  `commands/` (slash commands) + `skills/` + `.mcp.json` (MCP connectors). Plan:
-  (a) **bridge `.mcp.json` connectors** via the Module 4 MCP bridge; (b) adopt the
-  **bundle structure** to ship agent-os **role packs** (a non-technical person picks
-  "productivity"; a pro coder picks a dev pack) where every command runs through the
-  traced → scored → gated spine; (c) reuse their skills via the Agent Skills import
-  above. *Use when Module 4 (connectors) and Module 5 (dashboards) land.*
-- **[Onyx](https://github.com/onyx-dot-app/onyx)** — heavy agentic RAG over 50+
-  connectors, pluggable as a retrieval backend behind the Brain when a user wants
-  enterprise breadth (Module 4).
+- **Knowledge-graph view of the Brain** — evolve from flat chunks (Module 1) to a
+  navigable graph of entities/relationships, importable from a standard
+  knowledge-graph export and surfaced in the UI (Module 3) and dashboards (Module 5).
+  For Ahaan, his maths notes become a navigable map of concepts, not just search hits.
+- **Open `SKILL.md` ecosystem** — ✅ already compatible with the open Agent Skills
+  format; next, ship curated **role packs** (a non-technical "productivity" pack; a
+  pro-coder dev pack) where every command runs through the governed router.
+- **MCP connector bridge** — wire MCP connectors so skills/agents can reach real
+  tools (model-agnostic, your credentials), behind the risk gate and audit log.
+- **Pluggable heavy retrieval** — a richer RAG backend behind the Brain for users
+  who want enterprise breadth, without changing the local-first default.
 
 ## Principles
 
@@ -79,5 +59,5 @@ agent-os spine (traced → scored → gated), keeping the core local-first.
 - **Default-deny autonomy.** Read-only auto-runs; anything ambiguous or that
   writes/sends/deploys needs human approval.
 - **Everything leaves a trace, a score, and an improvement.** That's how it compounds.
-- **Mix in the best, don't reinvent.** Stand on great open tools (Understand-Anything,
-  Onyx, Ollama) behind the orchestration + evaluation spine, instead of rebuilding them.
+- **Mix in the best, don't reinvent.** Stand on solid open tools behind the
+  orchestration + evaluation spine, instead of rebuilding them.

@@ -1,13 +1,9 @@
 # Code review & engineering practices
 
-> Adapted from [Google's Engineering Practices Documentation](https://github.com/google/eng-practices)
-> (the Code Review Developer Guide), used under [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/),
-> and tailored to agent-os. "CL" (changelist) below means a pull request / commit.
-
-These practices apply to **all our projects** (agent-os and
-[ninja-harness](https://github.com/gagans23/ninja-harness)). They exist to keep
-one thing true over time: **the overall code health of the project improves with
-every change.**
+> How we review changes across agent-os and
+> [ninja-harness](https://github.com/gagans23/ninja-harness). "CL" below means a
+> pull request / commit. These exist to keep one thing true over time: **the
+> overall code health of the project improves with every change.**
 
 ## The standard
 
@@ -105,3 +101,5 @@ just a Nit, you're free to skip it.
 | Good descriptions | `.github/PULL_REQUEST_TEMPLATE.md` |
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for setup and the day-to-day workflow.
+
+<sub>Some wording draws on widely-used industry code-review guidance (incl. Google's, CC-BY 3.0).</sub>

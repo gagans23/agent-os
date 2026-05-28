@@ -1,15 +1,15 @@
 # The governed swarm 🐝 (Module 6)
 
-> Inspired by the Kimi-Agent-Swarm pattern (decompose → run in parallel →
+> The parallel multi-agent "swarm" pattern (decompose → run in parallel →
 > synthesize), placed **under** agent-os's trust spine and kept honest. The
 > orchestrator lives in [`agent_os/orchestrator.py`](../agent_os/orchestrator.py).
 
 Most AI tools do one task at a time. A swarm decomposes one goal into many
 independent sub-tasks, runs them at once, and synthesizes a single deliverable —
 great for broad-coverage work (summarize 40 papers, compare 20 options, draft a
-launch pack). The risk, in the words of the very article that popularized it:
+launch pack). The catch is well known:
 
-> "Speed without verification produces scaled-up errors, not scaled-up value."
+> Speed without verification produces scaled-up errors, not scaled-up value.
 
 That verification layer is exactly what agent-os already is. So our swarm is a
 swarm **where every sub-agent is traced, risk-gated, grounded, and scored.**

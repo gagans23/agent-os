@@ -1,6 +1,6 @@
 # The Brain 🧠 — your own context
 
-> Module 1. `agent_os/context.py`. The local-first answer to Onyx-style RAG: a
+> Module 1. `agent_os/context.py`. A local-first, dependency-light take on RAG: a
 > personal knowledge base your agents retrieve from, grounded and scored.
 
 The keystone of the personal-OS vision is an agent that is **self-aware of *your*
@@ -121,11 +121,9 @@ from Ollama/OpenAI for free (`provider.as_embedder()`), but you can pass your ow
 ## Where this is going — from chunks to a graph
 
 Flat chunks are the floor, not the ceiling. The next evolution of the Brain is a
-**knowledge graph view**: entities and relationships extracted from your context,
-explorable visually with guided tours and semantic search. We plan to draw on
-[Understand-Anything](https://github.com/Lum1104/Understand-Anything) (a Claude
-Code plugin that turns a codebase or knowledge base into an interactive knowledge
-graph) — both as inspiration for a graph layer over the Brain and as a connector:
-its `knowledge-graph.json` output can be **ingested into the Brain** so a
-codebase's structure becomes part of your personal context, then surfaced in the
-local UI (Module 3) and dashboards (Module 5). See the [roadmap](roadmap.md).
+**knowledge-graph view**: entities and relationships extracted from your context,
+explorable visually with guided tours and semantic search. A standard
+knowledge-graph export (e.g. a `knowledge-graph.json`) can be **ingested into the
+Brain** so a codebase's or corpus's structure becomes part of your personal
+context, then surfaced in the local UI (Module 3) and dashboards (Module 5). See
+the [roadmap](roadmap.md).

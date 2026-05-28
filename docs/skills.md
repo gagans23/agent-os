@@ -24,9 +24,7 @@ expected_artifacts: [final.md, ninja_report.json]
 - ...
 ```
 
-**[Agent Skills](https://agentskills.io) standard** — the open format used by
-[`anthropics/skills`](https://github.com/anthropics/skills) and the
-[knowledge-work plugins](https://github.com/anthropics/knowledge-work-plugins).
+**[Agent Skills](https://agentskills.io) standard** — the open `SKILL.md` format.
 Only `name` + `description` are required; the whole body is the instruction set:
 
 ```markdown
@@ -46,17 +44,16 @@ deterministic matcher still works) and treat the whole body as the procedure.
 
 ## Importing an open Agent Skills tree
 
-Skills are just markdown — bring in thousands of open ones with no code:
+Skills are just markdown — point at any folder of open `SKILL.md` skills, no code:
 
 ```bash
-git clone https://github.com/anthropics/skills
-export AGENT_OS_SKILLS_PATH="$PWD/skills/skills"     # os.pathsep-separated for many
+export AGENT_OS_SKILLS_PATH="/path/to/skills"        # os.pathsep-separated for many
 agent-os cmd "/skills"                                # your skills + the imported ones
 ```
 
-Discovery is **recursive** (`**/SKILL.md`), so nested trees — Agent Skills
-categories (`skills/<category>/<skill>/SKILL.md`) or a plugin's `skills/` folder —
-are all picked up. When a name collides across roots, **your local skill wins**.
+Discovery is **recursive** (`**/SKILL.md`), so nested trees — categories
+(`skills/<category>/<skill>/SKILL.md`) or a plugin's `skills/` folder — are all
+picked up. When a name collides across roots, **your local skill wins**.
 
 ## How a skill reaches the model (and why it's vendor-neutral)
 
@@ -90,8 +87,8 @@ want precise control over when it fires; otherwise they're derived.
 
 ## What's next in Module 4
 
-- **MCP connector bridge** — wire the `.mcp.json` connectors that the knowledge-work
-  plugins use, so skills can reach real tools (model-agnostic, your credentials).
-- **Role packs** — adopt the plugin bundle shape (`commands/` + `skills/`) to ship
-  curated packs (a non-technical "productivity" pack; a pro-coder dev pack).
-- **Understand-Anything graph import** into the Brain. See [roadmap](roadmap.md).
+- **MCP connector bridge** — wire MCP (`.mcp.json`) connectors so skills can reach
+  real tools (model-agnostic, your credentials).
+- **Role packs** — a plugin-bundle shape (`commands/` + `skills/`) to ship curated
+  packs (a non-technical "productivity" pack; a pro-coder dev pack).
+- **Knowledge-graph import** into the Brain. See [roadmap](roadmap.md).

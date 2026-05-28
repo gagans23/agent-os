@@ -20,22 +20,22 @@ flowchart LR
 📐 **Full diagrams & module map:** [docs/architecture.md](docs/architecture.md) ·
 🗺️ **Modular roadmap (toward a personal agent OS):** [docs/roadmap.md](docs/roadmap.md)
 
-> Status: **v0.9 — Agent Skills compatibility 🧩** (import the open skill
-> ecosystem), on top of a one-command install + local web UI 🖥️, model onboarding
-> (Ollama/OpenAI/Claude), the Brain 🧠, and a tamper-evident governance spine. The
-> three levels (Core · Reliability · Controlled Autonomy) work and are tested. Live
-> integrations (WhatsApp/Meta, Gmail, Cloudflare Tunnel, GitHub publish) are
-> pluggable adapters you wire with your own credentials — none are bundled or faked.
+> Status: **v0.11 — the governed swarm 🐝 + hardware model advisor 🩺**, on top of
+> Agent Skills compatibility, a one-command install + local web UI 🖥️, model
+> onboarding (Ollama/OpenAI/Claude), the Brain 🧠, and a tamper-evident governance
+> spine. The three levels (Core · Reliability · Controlled Autonomy) work and are
+> tested. Live integrations (WhatsApp/Meta, Gmail, Cloudflare Tunnel, GitHub
+> publish) are pluggable adapters you wire with your own credentials — none bundled
+> or faked.
 
-### Where this sits vs. Onyx
+### What agent-os is (and isn't)
 
-[Onyx](https://github.com/onyx-dot-app/onyx) is the open-source "application layer
-for LLMs" — excellent agentic **RAG over 50+ connectors**, with a polished UI.
-agent-os is **not** trying to out-connector Onyx. Our layer is the **orchestration
-+ evaluation + controlled-autonomy + personal-brain** spine: every agent action is
-**traced → scored by [Ninja Harness](https://github.com/gagans23/ninja-harness) →
-risk-gated → improved**. Heavy RAG can be plugged in (even Onyx itself); the core
-stays local-first (SQLite + stdlib) so a non-technical person can run it.
+agent-os is the **orchestration + evaluation + controlled-autonomy + personal-brain
+spine** for your own agents. Its job isn't to be the biggest pile of connectors or
+the flashiest chat UI — it's to make every agent action **traced → scored by
+[Ninja Harness](https://github.com/gagans23/ninja-harness) → risk-gated → improved**,
+running **local-first** (SQLite + stdlib) so a non-technical person can run it and
+heavier tools can be plugged in behind the same governed spine.
 
 ## Install
 
@@ -171,18 +171,16 @@ python examples/provider_demo.py           # offline walkthrough of all three ro
 📐 **Deep dive (the three roles, every provider, OpenAI-compatible endpoints, the
 opt-in wiring):** [docs/providers.md](docs/providers.md)
 
-## Skills, incl. Agent Skills 🧩 — bring the open ecosystem (v0.9)
+## Skills 🧩 — incl. the open SKILL.md standard
 
 Skills are reusable `SKILL.md` procedures the agent matches and follows. agent-os
 speaks both its own format **and** the open [Agent Skills](https://agentskills.io)
-standard ([`anthropics/skills`](https://github.com/anthropics/skills), the
-[knowledge-work plugins](https://github.com/anthropics/knowledge-work-plugins)), so
-you can import the open ecosystem with no code:
+standard (YAML-frontmatter `SKILL.md`), so you can point it at any folder of open
+skills and import them with no code:
 
 ```bash
-git clone https://github.com/anthropics/skills
-export AGENT_OS_SKILLS_PATH="$PWD/skills/skills"   # recursive, multi-root
-agent-os cmd "/skills"                              # your skills + imported ones
+export AGENT_OS_SKILLS_PATH="/path/to/any/skills/dir"   # recursive, multi-root
+agent-os cmd "/skills"                                   # your skills + imported ones
 ```
 
 A matched skill is injected into the prompt sent to **your** model — set
@@ -193,10 +191,9 @@ log, and the Ninja Harness score. 📐 [docs/skills.md](docs/skills.md)
 ## The governed swarm 🐝 — parallel, but verified (v0.10)
 
 One goal → a coordinator **decomposes** it → sub-tasks run **in parallel** → the
-coordinator **synthesizes** one deliverable. The swarm pattern (à la Kimi Agent
-Swarm), but placed *under* agent-os's trust spine — because, as that very playbook
-admits, *"speed without verification produces scaled-up errors, not scaled-up
-value."*
+coordinator **synthesizes** one deliverable. The parallel-swarm pattern, but placed
+*under* agent-os's trust spine — because speed without verification just produces
+scaled-up errors, not scaled-up value.
 
 ```bash
 export AGENT_OS_PROVIDER=ollama:llama3      # local + free; your model, your data
@@ -391,7 +388,7 @@ agent-os cmd "/reject <id>"                 # cancel it
 PRs welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for setup and the workflow,
 and **[docs/code-review.md](docs/code-review.md)** for how we review — small
 self-contained changes, tests in the same change, and descriptions that say *what*
-and *why* (adapted from [Google's engineering practices](https://github.com/google/eng-practices)).
+and *why*.
 
 ## License
 
