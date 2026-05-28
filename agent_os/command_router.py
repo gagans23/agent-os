@@ -147,6 +147,7 @@ class CommandRouter:
             "ask": self._ask,
             "audit": lambda a: self._audit(),
             "model": lambda a: self._model(),
+            "doctor": lambda a: self._doctor(),
             "job": self._job,
             "trace": self._trace,
             "run": self._run,
@@ -187,6 +188,7 @@ class CommandRouter:
             "  /ask <question>  answer from your knowledge base (grounded + scored)\n"
             "  /audit           recent audit entries + chain integrity\n"
             "  /model           show the configured model provider\n"
+            "  /doctor          detect hardware + recommend a local model\n"
             "  /job <id>        show a job record\n"
             "  /trace <id>      show a job's trace summary\n"
             "  /run <task>      submit a task (auto-runs if read-only; else needs approval)\n"
@@ -379,6 +381,11 @@ class CommandRouter:
             f"  powers: /ask + /run (answers) · /digest (synthesis) · Brain semantic search\n"
             f"  embedded chunks: {embeds}"
         )
+
+    def _doctor(self) -> str:
+        from agent_os.doctor import diagnose, render
+
+        return render(diagnose())
 
     def _digest(self) -> str:
         """Synthesize a cross-episode digest, score it, and persist it as a job.

@@ -73,6 +73,7 @@ PAGE = """<!doctype html>
     <button onclick="send('/agents')">Agents</button>
     <button onclick="send('/skills')">Skills</button>
     <button onclick="send('/model')">Model</button>
+    <button onclick="send('/doctor')">Doctor</button>
     <button onclick="send('/audit')">Audit</button>
     <button onclick="send('/pending')">Pending</button>
     <button onclick="send('/digest')">Digest</button>
@@ -202,6 +203,22 @@ def _make_handler(router) -> type[http.server.BaseHTTPRequestHandler]:
     return Handler
 
 
+def _bind(host: str, port: int, tries: int = 20) -> http.server.HTTPServer:
+    """Bind to `port`, or the next free one if it's taken (a stale instance is the
+    most common reason `agent-os ui` 'doesn't work'). Port 0 = let the OS choose."""
+    last: OSError | None = None
+    for candidate in range(port, port + tries) if port else [0]:
+        try:
+            return http.server.HTTPServer((host, candidate),
+                                          http.server.BaseHTTPRequestHandler)
+        except OSError as exc:  # address already in use
+            last = exc
+            if candidate != port:
+                continue
+            print(f"  port {candidate} is busy — trying {candidate + 1}…")
+    raise OSError(f"could not bind a port near {port} on {host}: {last}")
+
+
 def serve(host: str = "127.0.0.1", port: int = 8765, *, router=None,
           state_dir: str = "agent_state", skills_dir: str = "skills",
           traces_dir: str = "traces", suite: str | None = None,
@@ -225,12 +242,16 @@ def serve(host: str = "127.0.0.1", port: int = 8765, *, router=None,
             suite_path=suite,
         )
 
-    httpd = http.server.HTTPServer((host, port), _make_handler(router))
+    httpd = _bind(host, port)
+    httpd.RequestHandlerClass = _make_handler(router)
     url = f"http://{host}:{httpd.server_address[1]}/"
     if on_ready is not None:
         on_ready(httpd)
     else:
-        print(f"agent-os UI → {url}   (Ctrl-C to stop)")
+        bar = "─" * 52
+        print(f"\n{bar}\n  agent-os UI is running\n  →  {url}\n"
+              f"  Open that link in your browser.  (Ctrl-C to stop)\n{bar}\n",
+              flush=True)
         if open_browser:
             threading.Timer(0.6, lambda: webbrowser.open(url)).start()
     try:

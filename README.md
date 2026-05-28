@@ -57,13 +57,20 @@ pip install -e ".[dev]"                                                         
 ## Run it: the web UI 🖥️ ("click a button")
 
 ```bash
-agent-os ui          # opens http://127.0.0.1:8765 in your browser
+agent-os doctor      # detect your hardware → recommends a local model to run
+agent-os ui          # opens http://127.0.0.1:8765 (auto-picks a free port if busy)
 ```
 
 A single local page (stdlib server — nothing extra to install, **localhost-only**)
-to teach the brain, ask it questions, run tasks, and approve actions — driving the
-**same governed command router** as the CLI, so every action is still traced,
-scored, audited, and risk-gated. 📐 [docs/install-and-ui.md](docs/install-and-ui.md)
+to teach the brain, ask it questions, run tasks, swarm a goal, and approve actions —
+driving the **same governed command router** as the CLI, so every action is still
+traced, scored, audited, and risk-gated. The startup prints the exact URL; if the
+port is taken it falls back to the next free one. 📐
+[docs/install-and-ui.md](docs/install-and-ui.md)
+
+> **`agent-os doctor`** answers "which model can my machine run?" — it detects RAM /
+> Apple-Silicon / NVIDIA VRAM and recommends a local model + the exact
+> `export AGENT_OS_PROVIDER=...` line. (Also `/doctor` in the UI.)
 
 ## Try the loop (no external services)
 

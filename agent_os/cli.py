@@ -136,6 +136,14 @@ def _cmd_ui(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    """Detect hardware and recommend a local model."""
+    from agent_os.doctor import diagnose, render
+
+    print(render(diagnose()))
+    return 0
+
+
 def _cmd_swarm(args: argparse.Namespace) -> int:
     """Run a goal as a governed parallel swarm (decompose → parallel → synthesize)."""
     from agent_os.orchestrator import Orchestrator
@@ -210,6 +218,9 @@ def main(argv: list[str] | None = None) -> int:
     p_cmd.add_argument("--traces-dir", default="traces")
     p_cmd.add_argument("--suite", default=None, help="Ninja Harness suite path for /eval.")
     p_cmd.set_defaults(func=_cmd_router)
+
+    p_doc = sub.add_parser("doctor", help="Detect hardware + recommend a local model.")
+    p_doc.set_defaults(func=_cmd_doctor)
 
     p_sw = sub.add_parser("swarm", help="Run a goal as a governed parallel swarm.")
     p_sw.add_argument("goal")
