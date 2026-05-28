@@ -148,6 +148,7 @@ class CommandRouter:
             "audit": lambda a: self._audit(),
             "model": lambda a: self._model(),
             "doctor": lambda a: self._doctor(),
+            "cost": lambda a: self._cost(),
             "job": self._job,
             "trace": self._trace,
             "run": self._run,
@@ -189,6 +190,7 @@ class CommandRouter:
             "  /audit           recent audit entries + chain integrity\n"
             "  /model           show the configured model provider\n"
             "  /doctor          detect hardware + recommend a local model\n"
+            "  /cost            cost · latency · token usage across recent runs\n"
             "  /job <id>        show a job record\n"
             "  /trace <id>      show a job's trace summary\n"
             "  /run <task>      submit a task (auto-runs if read-only; else needs approval)\n"
@@ -387,6 +389,33 @@ class CommandRouter:
 
         return render(diagnose())
 
+    def _cost(self) -> str:
+        """Cost / latency / token usage rolled up across recent runs."""
+        from agent_os.metering import estimate_cost, fmt_cost
+
+        sessions = self.memory.recent_sessions(limit=50)
+        metered = [s for s in sessions if s.get("latency_s") is not None]
+        if not metered:
+            return "No metered runs yet. Try /run or /swarm, then /cost."
+        pname = self.provider.name if self.provider else "local (no model)"
+        pricing_key = self.provider.name if self.provider else "ollama"
+        in_tok = sum(int(s.get("in_tokens") or 0) for s in metered)
+        out_tok = sum(int(s.get("out_tokens") or 0) for s in metered)
+        lat = sum(float(s.get("latency_s") or 0) for s in metered)
+        cost = estimate_cost(pricing_key, in_tok, out_tok)
+        return (
+            f"Cost & usage — last {len(metered)} run(s) · provider: {pname}\n"
+            f"  tokens : ~{in_tok} in / ~{out_tok} out  (~{in_tok + out_tok} total)\n"
+            f"  latency: {lat:.1f}s total · {lat / len(metered):.2f}s avg\n"
+            f"  est. cost: {fmt_cost(cost)}  (estimate — verify vs. your provider's pricing)"
+        )
+
+    def _meter_line(self, result) -> str:
+        from agent_os.metering import Meter
+
+        m = Meter(result.latency_s, result.in_tokens, result.out_tokens)
+        return f"[{m.line(self.provider.name if self.provider else None)}]"
+
     def _digest(self) -> str:
         """Synthesize a cross-episode digest, score it, and persist it as a job.
         Uses self.digest_source (feed fetcher) + self.reasoner (your LLM)."""
@@ -444,8 +473,8 @@ class CommandRouter:
         assessment = classify_risk(task)
         label = "AMBIGUOUS" if assessment.ambiguous else assessment.level.label
         if not assessment.requires_approval:
-            _result, summary = self._execute(task, self._profile_for("READ_ONLY"))
-            return f"[risk: READ_ONLY → auto-run]\n{summary}"
+            result, summary = self._execute(task, self._profile_for("READ_ONLY"))
+            return f"[risk: READ_ONLY → auto-run]\n{summary}\n{self._meter_line(result)}"
         approval_id = self.approvals.enqueue(
             task, self._profile_for(assessment.level.label), label, assessment.reason,
         )

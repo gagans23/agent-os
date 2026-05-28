@@ -59,6 +59,7 @@ agent_os/
   profiles.py        — researcher/operator/builder/qa
   orchestrator.py    — the governed swarm: decompose → parallel → synthesize (Module 6)
   doctor.py          — hardware-aware model advisor (`agent-os doctor`, `/doctor`)
+  metering.py        — cost/latency/token accounting (`/cost`); est. tokens + pricing table
   insights.py / reasoners.py — cross-episode digest + LLM reasoner adapter
   improvement.py     — propose-only improvement proposals
   supervisor.py / health.py / reliability.py / token_health.py / allowlist.py / daily_eval.py

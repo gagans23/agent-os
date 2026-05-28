@@ -137,6 +137,15 @@ def test_run_read_only_auto_executes(router) -> None:
     assert "Ninja score" in out
     # a job was created
     assert len(router.jobs.list()) == 1
+    # metering line is appended (latency + token estimate)
+    assert "tok" in out
+
+
+def test_cost_command_aggregates(router) -> None:
+    assert "No metered runs" in router.handle("/cost")
+    router.handle("/run summarize the latest research")
+    out = router.handle("/cost")
+    assert "Cost & usage" in out and "tokens" in out and "est. cost" in out
 
 
 def test_run_write_enqueues_for_approval(router) -> None:

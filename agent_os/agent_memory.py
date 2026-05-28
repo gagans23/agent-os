@@ -140,6 +140,18 @@ class AgentMemory:
         path.write_text(json.dumps(payload, indent=2, default=str))
         return path
 
+    def recent_sessions(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Most-recent session payloads (newest first), for cost/metering rollups."""
+        files = sorted((self.root / "sessions").glob("*.json"),
+                       key=lambda p: p.stat().st_mtime, reverse=True)
+        out: list[dict[str, Any]] = []
+        for p in files[:limit]:
+            try:
+                out.append(json.loads(p.read_text()))
+            except (ValueError, OSError):
+                continue
+        return out
+
     def context_for(self, command: str, max_facts: int = 5) -> str:
         """Build a small memory context string to hand an agent."""
         facts = self.search(command, limit=max_facts)

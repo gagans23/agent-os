@@ -236,6 +236,14 @@ agent-os cmd "/risk make the prod table empty"   # → WRITE → REQUIRES APPROV
 Audit log — 12 entries · chain ✅ intact
 ```
 
+Every run is also **metered** — latency, estimated tokens, and estimated cost
+(`$0` on local models). `/cost` rolls it up, so a run is quality- *and* cost- *and*
+safety-accounted.
+
+```bash
+agent-os cmd "/cost"   # tokens · latency · est. cost across recent runs
+```
+
 See [SECURITY.md](SECURITY.md) for the full threat model and known limitations.
 
 ## Cross-episode insights (v0.4)

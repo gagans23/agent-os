@@ -13,6 +13,7 @@ Ninja Harness is the evaluation gate.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -20,6 +21,7 @@ from typing import Any
 from agent_os.agent_memory import AgentMemory
 from agent_os.improvement import ImprovementProposal, propose_improvement
 from agent_os.jobs import JobStore
+from agent_os.metering import estimate_tokens
 from agent_os.profiles import AgentProfile, get_profile
 from agent_os.skill_registry import Skill, SkillRegistry
 from agent_os.trace_recorder import JobRecorder, TraceRecorder
@@ -42,6 +44,9 @@ class JobResult:
     trace_path: str
     report_path: str | None
     summary: str
+    latency_s: float = 0.0       # wall time spent in the agent (the model call)
+    in_tokens: int = 0           # estimated input tokens (command + context)
+    out_tokens: int = 0          # estimated output tokens (final answer)
 
 
 def _evaluate(trace: dict, case_path: str | None, case: Any = None):
@@ -113,12 +118,16 @@ def run_job(
     if jobs is not None:
         jobs.create(job.job_id, command, profile=prof.name, skill=skill.name if skill else "")
 
+    _t0 = time.perf_counter()
     try:
         final = agent_fn(command, context, job)
     except Exception as exc:  # noqa: BLE001 - record the failure durably
         if jobs is not None:
             jobs.finish(job.job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
         raise
+    latency_s = round(time.perf_counter() - _t0, 3)
+    in_tokens = estimate_tokens(f"{command}\n{context}")
+    out_tokens = estimate_tokens(final or "")
     job.set_final(final)
     trace_path = job.save_trace()
 
@@ -144,6 +153,9 @@ def run_job(
         "certification": result.certification if result else None,
         "ninja_score": result.ninja_score if result else None,
         "proposal": proposal.to_dict() if proposal else None,
+        "latency_s": latency_s,
+        "in_tokens": in_tokens,
+        "out_tokens": out_tokens,
     })
 
     # Platform verdict honors the profile threshold: a Ninja-PASS run that falls
@@ -184,4 +196,7 @@ def run_job(
         trace_path=str(trace_path),
         report_path=report_path,
         summary=summary,
+        latency_s=latency_s,
+        in_tokens=in_tokens,
+        out_tokens=out_tokens,
     )

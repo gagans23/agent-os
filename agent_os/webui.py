@@ -74,6 +74,7 @@ PAGE = """<!doctype html>
     <button onclick="send('/skills')">Skills</button>
     <button onclick="send('/model')">Model</button>
     <button onclick="send('/doctor')">Doctor</button>
+    <button onclick="send('/cost')">Cost</button>
     <button onclick="send('/audit')">Audit</button>
     <button onclick="send('/pending')">Pending</button>
     <button onclick="send('/digest')">Digest</button>
