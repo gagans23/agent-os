@@ -136,6 +136,21 @@ def _cmd_ui(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_swarm(args: argparse.Namespace) -> int:
+    """Run a goal as a governed parallel swarm (decompose → parallel → synthesize)."""
+    from agent_os.orchestrator import Orchestrator
+    from agent_os.providers import provider_from_env
+
+    orch = Orchestrator(
+        provider=provider_from_env(),
+        skills=SkillRegistry(skill_roots_from_env(args.skills_dir)),
+        state_dir=args.state_dir, traces_dir=args.traces_dir,
+        jobs_db=f"{args.state_dir}/jobs.db", concurrency=args.concurrency,
+    )
+    print(orch.run(args.goal, n=args.subtasks).render())
+    return 0
+
+
 def _cmd_skills(args: argparse.Namespace) -> int:
     reg = SkillRegistry(skill_roots_from_env(args.skills_dir))
     skills = reg.all()
@@ -195,6 +210,17 @@ def main(argv: list[str] | None = None) -> int:
     p_cmd.add_argument("--traces-dir", default="traces")
     p_cmd.add_argument("--suite", default=None, help="Ninja Harness suite path for /eval.")
     p_cmd.set_defaults(func=_cmd_router)
+
+    p_sw = sub.add_parser("swarm", help="Run a goal as a governed parallel swarm.")
+    p_sw.add_argument("goal")
+    p_sw.add_argument("--concurrency", type=int, default=4,
+                      help="Max sub-tasks running at once (size to your machine/provider).")
+    p_sw.add_argument("--subtasks", type=int, default=None,
+                      help="Target number of sub-tasks for model decomposition.")
+    p_sw.add_argument("--skills-dir", default="skills")
+    p_sw.add_argument("--state-dir", default="agent_state")
+    p_sw.add_argument("--traces-dir", default="traces")
+    p_sw.set_defaults(func=_cmd_swarm)
 
     p_ui = sub.add_parser("ui", help="Launch the local web UI (click a button).")
     p_ui.add_argument("--host", default="127.0.0.1", help="Bind address (localhost by default).")

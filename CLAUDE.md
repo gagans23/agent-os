@@ -57,6 +57,7 @@ agent_os/
   agent_memory.py    — persistent memory (MEMORY/USER/state.db/sessions)
   skill_registry.py  — load skills from skills/*/SKILL.md
   profiles.py        — researcher/operator/builder/qa
+  orchestrator.py    — the governed swarm: decompose → parallel → synthesize (Module 6)
   insights.py / reasoners.py — cross-episode digest + LLM reasoner adapter
   improvement.py     — propose-only improvement proposals
   supervisor.py / health.py / reliability.py / token_health.py / allowlist.py / daily_eval.py
@@ -88,6 +89,12 @@ python examples/ahaan_maths_demo.py
   docs/roadmap.md → Planned integrations.
 - **5 Watchers + dashboards** — later: folder/event watchers, trend dashboards,
   knowledge-graph view of the Brain.
+- **6 The governed swarm** ✅ — `orchestrator.py`: decompose → bounded-parallel
+  sub-jobs → synthesize. Each sub-task is traced + risk-gated (default-deny:
+  privileged sub-tasks are gated, never auto-run) + Ninja-scored; synthesis scored
+  too. Local-first, Ollama-testable, honest concurrency (no fake "300"). `/swarm`,
+  `agent-os swarm`, UI card. Per-worker WAL connections (busy_timeout before WAL).
+  See docs/orchestrator.md.
 
 ## Boundaries I cannot cross for the user
 

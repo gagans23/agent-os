@@ -26,6 +26,7 @@ messages, write files, and deploy. The controls that keep that safe:
 | Silent quality regression | Every action is **scored by Ninja Harness**; weak runs are flagged and produce a propose-only improvement (never auto-applied). |
 | Handler errors leaking internals | Router **error boundary** returns a friendly message and audits the error — no stack traces to the user. |
 | Web UI exposure | `agent-os ui` binds to **127.0.0.1** (localhost) with **no built-in auth**; it drives the same governed router (audit + risk gating still apply). Do not bind it to a public address without your own auth/TLS in front. |
+| Parallel privilege escalation (the swarm) | The orchestrator (`/swarm`) **classifies every sub-task and default-denies**: only read-only sub-tasks auto-run; any that write/send/deploy are **gated**, never auto-executed. Each sub-task is a traced, scored job; the swarm is recorded in the audit log. |
 
 ## Known limitations (be aware)
 

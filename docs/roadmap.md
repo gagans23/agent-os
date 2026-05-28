@@ -26,6 +26,7 @@ plugged in (even Onyx itself); the core stays local-first so a child can run it.
 | 3 | **Easy install + UI** | "click a button"; non-technical install | ✅ `install.sh` one-command (local venv, no sudo) + `webui.py` minimal local web UI (`agent-os ui`, stdlib, localhost) over the same governed router |
 | 4 | **Pro-coder + connectors** | augment coders; ingest more sources | 🚧 in progress — ✅ **Agent Skills** compatibility (`SKILL.md` spec, recursive/multi-root import via `AGENT_OS_SKILLS_PATH`, model-agnostic injection); next: MCP connector bridge, **knowledge-work** role packs, Understand-Anything graph import, Claude Code/Cursor/Aider links |
 | 5 | **Watchers + dashboards** | monitor your computer/thinking | later — folder/event watchers, trend dashboards, **knowledge-graph view of the Brain** |
+| 6 | **The governed swarm** 🐝 | parallel scale, under the trust spine | ✅ `orchestrator.py` — decompose → bounded-parallel sub-jobs → synthesize; each sub-task traced + risk-gated (default-deny) + Ninja-scored; local-first, Ollama-testable, honest concurrency; `/swarm`, `agent-os swarm`, UI card. [deep dive](orchestrator.md) |
 
 The deep dives: [the Brain](brain.md) · [model onboarding](providers.md) ·
 [skills & Agent Skills](skills.md) · [install + UI](install-and-ui.md) ·

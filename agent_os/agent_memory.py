@@ -40,10 +40,12 @@ class AgentMemory:
         if not self.user_md.exists():
             self.user_md.write_text(_USER_SEED)
         self.db_path = self.root / "state.db"
-        self._db = sqlite3.connect(self.db_path)
+        self._db = sqlite3.connect(self.db_path, timeout=5.0)
         self._db.row_factory = sqlite3.Row
-        self._db.execute("PRAGMA journal_mode=WAL")
+        # busy_timeout before the WAL switch: concurrent opens (the swarm) wait for
+        # the brief exclusive lock rather than erroring with "database is locked".
         self._db.execute("PRAGMA busy_timeout=5000")
+        self._db.execute("PRAGMA journal_mode=WAL")
         self._init_db()
 
     def _init_db(self) -> None:

@@ -183,6 +183,34 @@ A matched skill is injected into the prompt sent to **your** model — set
 hardwired to one vendor**, and privileged tasks still pass the risk gate, the audit
 log, and the Ninja Harness score. 📐 [docs/skills.md](docs/skills.md)
 
+## The governed swarm 🐝 — parallel, but verified (v0.10)
+
+One goal → a coordinator **decomposes** it → sub-tasks run **in parallel** → the
+coordinator **synthesizes** one deliverable. The swarm pattern (à la Kimi Agent
+Swarm), but placed *under* agent-os's trust spine — because, as that very playbook
+admits, *"speed without verification produces scaled-up errors, not scaled-up
+value."*
+
+```bash
+export AGENT_OS_PROVIDER=ollama:llama3      # local + free; your model, your data
+agent-os swarm "research the top 5 local LLM runtimes; for each: license, RAM, speed; compare in a table"
+# or:  agent-os cmd "/swarm ..."   ·   or the 🐝 card in `agent-os ui`
+```
+
+```
+🐝 Swarm: ...
+   3 sub-task(s) · 2 done · 1 gated · 0 failed
+   - [PASS 89] summarize the intro
+   - [GATED:WRITE] delete the prod database     ← default-deny: never auto-run
+Synthesis scored 88.8 (Job 2-14f5f9)
+```
+
+Every sub-task is a **real job** (traced, risk-gated, Ninja-scored, queryable via
+`/job`/`/trace`); privileged sub-tasks are **gated**, not auto-executed; the
+synthesis is scored too. **Local-first, your model, honest concurrency** (a
+bounded pool sized to your machine — no fictional "300"). 📐
+[docs/orchestrator.md](docs/orchestrator.md)
+
 ## Trust & Governance — tamper-evident by default (v0.6)
 
 Every command is recorded into a **hash-chained, tamper-evident audit log**

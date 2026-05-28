@@ -24,10 +24,12 @@ class JobStore:
     def __init__(self, db_path: str | Path = "agent_state/jobs.db") -> None:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._db = sqlite3.connect(self.db_path)
+        self._db = sqlite3.connect(self.db_path, timeout=5.0)
         self._db.row_factory = sqlite3.Row
-        self._db.execute("PRAGMA journal_mode=WAL")
+        # busy_timeout BEFORE the WAL switch so concurrent opens wait for the brief
+        # exclusive lock instead of erroring (the swarm opens many connections).
         self._db.execute("PRAGMA busy_timeout=5000")
+        self._db.execute("PRAGMA journal_mode=WAL")
         self._init_db()
 
     def _init_db(self) -> None:

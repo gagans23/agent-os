@@ -110,6 +110,17 @@ PAGE = """<!doctype html>
   </div>
 
   <div class="card">
+    <h2>🐝 Swarm a goal</h2>
+    <p class="hint">Decompose → run sub-tasks in parallel (each traced + scored) →
+      synthesize one deliverable. Privileged sub-tasks are gated.</p>
+    <div class="flex">
+      <input id="swarm" type="text" placeholder="research the top 5 local LLM runtimes; compare in a table"
+             onkeydown="if(event.key==='Enter')swarm()" />
+      <button class="primary" onclick="swarm()">Swarm</button>
+    </div>
+  </div>
+
+  <div class="card">
     <h2>&gt;_ Command</h2>
     <div class="flex">
       <input id="cmd" type="text" placeholder="/help"
@@ -138,6 +149,7 @@ function sendInput(){ const v=document.getElementById('cmd').value.trim(); if(v)
 function learn(){ const v=document.getElementById('learn').value.trim(); if(v) send('/learn '+v); }
 function ask(){ const v=document.getElementById('ask').value.trim(); if(v) send('/ask '+v); }
 function run(){ const v=document.getElementById('run').value.trim(); if(v) send('/run '+v); }
+function swarm(){ const v=document.getElementById('swarm').value.trim(); if(v) send('/swarm '+v); }
 
 // Populate the status line on load.
 fetch('/api/cmd', {method:'POST', headers:{'Content-Type':'application/json'},

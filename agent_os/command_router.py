@@ -150,6 +150,7 @@ class CommandRouter:
             "job": self._job,
             "trace": self._trace,
             "run": self._run,
+            "swarm": self._swarm,
             "risk": self._risk,
             "pending": lambda a: self._pending(),
             "approve": self._approve,
@@ -189,6 +190,7 @@ class CommandRouter:
             "  /job <id>        show a job record\n"
             "  /trace <id>      show a job's trace summary\n"
             "  /run <task>      submit a task (auto-runs if read-only; else needs approval)\n"
+            "  /swarm <goal>    governed swarm: decompose → parallel sub-jobs → synthesize\n"
             "  /risk <task>     show the risk classification for a task\n"
             "  /pending         list actions awaiting approval\n"
             "  /approve <id>    approve & execute a pending action\n"
@@ -446,6 +448,25 @@ class CommandRouter:
             f"Approve:  /approve {approval_id}\n"
             f"Reject:   /reject {approval_id}"
         )
+
+    def _swarm(self, args: list[str]) -> str:
+        """Governed swarm: decompose the goal, run sub-tasks in parallel (each a
+        traced, risk-gated, scored job), then synthesize one deliverable."""
+        from agent_os.orchestrator import Orchestrator
+
+        goal = " ".join(args).strip()
+        if not goal:
+            return ("Usage: /swarm <goal>\n"
+                    "Decomposes the goal, runs read-only sub-tasks in parallel "
+                    "(each traced + scored), gates anything privileged, then "
+                    "synthesizes one deliverable. Set AGENT_OS_PROVIDER for real "
+                    "decomposition/synthesis (Ollama works).")
+        orch = Orchestrator(
+            provider=self.provider, skills=self.skills,
+            state_dir=str(self.memory.root), traces_dir=str(self.recorder.root),
+            jobs_db=str(self.jobs.db_path), audit=self.audit,
+        )
+        return orch.run(goal).render()
 
     def _risk(self, args: list[str]) -> str:
         from agent_os.risk import classify_risk
