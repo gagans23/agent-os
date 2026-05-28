@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>agent-os — your personal agent OS, governed by default</title>
+<meta name="description" content="agent-os is a local-first personal agent platform: every agent action is traced, scored, risk-gated, and improved. Ollama-first, the Brain (your own context), a governed parallel swarm, one-command install and a local web UI." />
+<style>
+  :root{
+    --bg:#0b0e13; --bg2:#0e1116; --card:#151a22; --card2:#1b212b; --line:#262c36;
+    --fg:#e6edf3; --muted:#9aa6b2; --accent:#3b82f6; --accent2:#22d3ee;
+    --ok:#2ea043; --warn:#d29922; --bad:#f85149; --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:linear-gradient(180deg,#0b0e13,#0c1018 40%,#0b0e13);
+    color:var(--fg);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  a{color:var(--accent2);text-decoration:none} a:hover{text-decoration:underline}
+  code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+  /* nav */
+  nav{position:sticky;top:0;z-index:20;background:rgba(11,14,19,.86);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;align-items:center;gap:18px;height:56px;flex-wrap:wrap}
+  nav .brand{font-weight:700;letter-spacing:.2px}
+  nav .links{display:flex;gap:16px;flex-wrap:wrap;margin-left:auto;font-size:14px}
+  nav .links a{color:var(--muted)} nav .links a:hover{color:var(--fg);text-decoration:none}
+  /* hero */
+  header.hero{padding:72px 0 36px;text-align:center}
+  .badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:22px}
+  .badge{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;
+    padding:4px 11px;background:var(--card)}
+  h1{font-size:clamp(34px,6vw,56px);line-height:1.05;margin:.1em 0 .25em;
+    background:linear-gradient(90deg,#fff,#9fd0ff 60%,#22d3ee);-webkit-background-clip:text;
+    background-clip:text;color:transparent}
+  .tag{font-size:clamp(17px,2.6vw,22px);color:var(--muted);max-width:760px;margin:0 auto 18px}
+  .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+  .btn{display:inline-block;padding:11px 18px;border-radius:10px;font-weight:600;font-size:15px;border:1px solid var(--line)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.ghost{background:var(--card);color:var(--fg)}
+  /* sections */
+  section{padding:46px 0;border-top:1px solid var(--line)}
+  h2{font-size:clamp(24px,4vw,32px);margin:0 0 6px}
+  h2 .em{color:var(--accent2)}
+  .lede{color:var(--muted);max-width:760px;margin:0 0 26px}
+  h3{font-size:19px;margin:26px 0 8px}
+  p{color:#cdd6e0}
+  .muted{color:var(--muted)}
+  /* code */
+  pre{background:#060912;border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+    overflow:auto;font-size:13.5px;line-height:1.6}
+  pre .c{color:#6b7785} .k{color:#7ee787} .o{color:#79c0ff}
+  code.inline{background:#0f1622;border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:.92em}
+  /* grid + cards */
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:780px){.g2,.g3{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+  .card h3{margin-top:0}
+  .card .pill{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+    color:var(--accent2);display:block;margin-bottom:6px}
+  .done{color:var(--ok)} .prog{color:var(--warn)} .later{color:var(--muted)}
+  /* pipeline */
+  .flow{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;justify-content:center;margin:8px 0 4px}
+  .node{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;
+    font-size:13px;text-align:center;min-width:96px}
+  .node b{display:block;font-size:13px;color:var(--fg)} .node span{font-size:11px;color:var(--muted)}
+  .arrow{align-self:center;color:var(--accent);font-weight:700}
+  .gatebox{border:1px dashed var(--accent);border-radius:10px;padding:8px 12px;background:rgba(59,130,246,.06)}
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600} td code{color:var(--accent2)}
+  /* principles */
+  .prin{display:flex;gap:12px;align-items:flex-start;margin:10px 0}
+  .prin .dot{margin-top:8px;width:8px;height:8px;border-radius:50%;background:var(--accent2);flex:none}
+  footer{padding:40px 0 70px;border-top:1px solid var(--line);color:var(--muted);font-size:14px;text-align:center}
+  .kbd{background:#0f1622;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 6px;font-size:.85em}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <span class="brand">🤖 agent-os</span>
+  <span class="links">
+    <a href="#what">What</a>
+    <a href="#quickstart">Quickstart</a>
+    <a href="#pipeline">How it works</a>
+    <a href="#modules">Modules</a>
+    <a href="#features">Features</a>
+    <a href="#commands">Commands</a>
+    <a href="#principles">Principles</a>
+    <a href="https://github.com/gagans23/agent-os">GitHub ↗</a>
+  </span>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <div class="badges">
+    <span class="badge">local-first</span>
+    <span class="badge">Ollama-first · your model</span>
+    <span class="badge">traced · scored · gated</span>
+    <span class="badge">Apache-2.0</span>
+    <span class="badge">Python 3.11+</span>
+  </div>
+  <h1>Your personal agent OS,<br/>governed by default.</h1>
+  <p class="tag">Click a button and agents come up and do the work — research, triage,
+    drafting, monitoring — <b>grounded in your own context</b>, with <b>every action
+    traced, scored, risk-gated, and improved</b>. Runs on your machine, on your model.</p>
+  <div class="cta">
+    <a class="btn primary" href="#quickstart">Get started</a>
+    <a class="btn ghost" href="https://github.com/gagans23/agent-os">Star on GitHub</a>
+    <a class="btn ghost" href="https://github.com/gagans23/agent-os/releases">Releases</a>
+  </div>
+  <p class="muted" style="margin-top:22px;font-size:13px">A non-technical person should be able to install it; a pro coder should be able to augment their work with it.</p>
+</div></header>
+
+<!-- WHAT -->
+<section id="what"><div class="wrap">
+  <h2>What agent-os <span class="em">is</span> (and isn't)</h2>
+  <p class="lede">It isn't the biggest pile of connectors or the flashiest chat UI.
+    agent-os is the <b>orchestration + evaluation + controlled-autonomy + personal-brain
+    spine</b> for your own agents — the layer that makes automation <em>trustworthy</em>.</p>
+  <div class="grid g3">
+    <div class="card"><span class="pill">Trustworthy</span><h3>Every action is accountable</h3>
+      <p class="muted">Each run is recorded as a trace, scored by an evaluation gate, written to a tamper-evident audit log, and — if weak — turned into an improvement proposal.</p></div>
+    <div class="card"><span class="pill">Private</span><h3>Local-first, your model</h3>
+      <p class="muted">SQLite + the standard library at the core. Bring Ollama (free, local), OpenAI, or Claude with one env var. No bundled keys, no hidden network calls.</p></div>
+    <div class="card"><span class="pill">Safe</span><h3>Default-deny autonomy</h3>
+      <p class="muted">Read-only tasks auto-run; anything that writes, sends, or deploys — or is ambiguous — is gated for your approval. Nothing privileged slips through.</p></div>
+  </div>
+</div></section>
+
+<!-- QUICKSTART -->
+<section id="quickstart"><div class="wrap">
+  <h2>Quickstart — <span class="em">one command</span></h2>
+  <p class="lede">Creates a local virtualenv (no sudo, no global state), installs the
+    evaluation gate + agent-os, and tells you exactly what to run next.</p>
+<pre><span class="c"># install (or run ./install.sh from a clone)</span>
+curl -fsSL https://raw.githubusercontent.com/gagans23/agent-os/main/install.sh | bash
+
+<span class="c"># which model can my machine run?</span>
+agent-os <span class="k">doctor</span>
+<span class="c"># → detects RAM / Apple-Silicon / NVIDIA VRAM + Ollama, recommends a model</span>
+
+<span class="c"># plug a local, free model (no API key)</span>
+<span class="o">export</span> AGENT_OS_PROVIDER=ollama:llama3.1:8b
+
+<span class="c"># open the local web UI — click a button</span>
+agent-os <span class="k">ui</span>      <span class="c"># http://127.0.0.1:8765 (auto-picks a free port if busy)</span></pre>
+  <p class="muted">Prefer the terminal? <code class="inline">agent-os cmd "/help"</code> lists every command.
+    Teach it something: <code class="inline">agent-os cmd "/learn ~/notes.md"</code> then <code class="inline">agent-os cmd "/ask what did I learn?"</code></p>
+</div></section>
+
+<!-- PIPELINE -->
+<section id="pipeline"><div class="wrap">
+  <h2>How it works — <span class="em">the governed loop</span></h2>
+  <p class="lede">Every command — from the CLI, the web UI, or a chat transport — flows
+    through the same router and the same guarantees.</p>
+  <div class="flow">
+    <div class="node"><b>Command</b><span>CLI · UI · chat</span></div>
+    <div class="arrow">→</div>
+    <div class="node"><b>Router</b><span>+ your context</span></div>
+    <div class="arrow">→</div>
+    <div class="gatebox"><div class="node" style="border:none;background:none;min-width:auto"><b>Risk gate</b><span>default-deny</span></div></div>
+    <div class="arrow">→</div>
+    <div class="node"><b>Execute</b><span>your model</span></div>
+    <div class="arrow">→</div>
+    <div class="node"><b>Trace</b><span>full trajectory</span></div>
+    <div class="arrow">→</div>
+    <div class="node"><b>Score</b><span>Ninja Harness</span></div>
+    <div class="arrow">→</div>
+    <div class="node"><b>Improve</b><span>propose-only</span></div>
+  </div>
+  <p class="muted" style="margin-top:18px">Write / send / deploy tasks branch off the risk gate into an
+    <b>approval queue</b> (<code class="inline">/approve</code> · <code class="inline">/reject</code>) — they never auto-run. Every step is appended to a
+    <b>hash-chained audit log</b> you can verify for tampering.</p>
+</div></section>
+
+<!-- MODULES -->
+<section id="modules"><div class="wrap">
+  <h2>Built <span class="em">module by module</span></h2>
+  <p class="lede">Never boiling the ocean. Each module is local-first and sits behind the same traced → scored → gated spine.</p>
+  <div class="grid g2">
+    <div class="card"><span class="pill done">✅ Module 0 — Trust &amp; Governance</span>
+      <p class="muted">Persistent jobs, memory, traces, agent profiles, skills; a default-deny + tool-aware risk classifier; an approval queue; a <b>tamper-evident hash-chained audit log</b>; the evaluation gate; supervisor / health / reliability.</p></div>
+    <div class="card"><span class="pill done">✅ Module 1 — The Brain 🧠</span>
+      <p class="muted">A local knowledge base your agents retrieve from. <code class="inline">/learn</code> your notes/files; <code class="inline">/ask</code> answers <em>only</em> from your context and is scored for grounding. Hybrid keyword + semantic search when an embedder is configured.</p></div>
+    <div class="card"><span class="pill done">✅ Module 2 — Model onboarding 🧩</span>
+      <p class="muted">One env var (<code class="inline">AGENT_OS_PROVIDER</code>) plugs in Ollama / OpenAI / Claude — stdlib HTTP, no SDK. Powers answers, synthesis, and the Brain's embeddings. Plus <code class="inline">agent-os doctor</code>, a hardware-aware model advisor.</p></div>
+    <div class="card"><span class="pill done">✅ Module 3 — Easy install + UI 🖥️</span>
+      <p class="muted">A one-command installer and a minimal local web UI (<code class="inline">agent-os ui</code>) on the standard-library server — nothing extra to install, localhost-only, driving the same governed router.</p></div>
+    <div class="card"><span class="pill prog">🚧 Module 4 — Pro-coder + connectors</span>
+      <p class="muted">✅ Compatible with the open <code class="inline">SKILL.md</code> standard (import any skills folder via <code class="inline">AGENT_OS_SKILLS_PATH</code>). Next: an MCP connector bridge, curated role packs, knowledge-graph import, and coding-agent links.</p></div>
+    <div class="card"><span class="pill done">✅ Module 6 — The governed swarm 🐝</span>
+      <p class="muted">One goal → decompose → run sub-tasks in <b>bounded parallel</b> → synthesize one deliverable. Each sub-task is a real, traced, risk-gated, scored job. Honest concurrency, your model, your machine.</p></div>
+  </div>
+  <p class="muted" style="margin-top:14px">Module 5 — watchers &amp; dashboards (folder/event watchers, trend dashboards, a knowledge-graph view of the Brain) — is next on the roadmap.</p>
+</div></section>
+
+<!-- FEATURES -->
+<section id="features"><div class="wrap">
+  <h2>Feature <span class="em">deep-dive</span></h2>
+
+  <h3>🧠 The Brain — your own context</h3>
+  <p>Upload notes, files, or whole folders; agents retrieve from them and answer grounded in <em>your</em> material, not a model's guess. Answers are scored against the source, so ungrounded ones get flagged.</p>
+<pre>agent-os cmd <span class="o">"/learn To add fractions with the same denominator, add the numerators."</span>
+agent-os cmd <span class="o">"/ask how do I add fractions?"</span>
+<span class="c">→ Based on your notes: ...                         [PASS · grounding 0.75]</span></pre>
+
+  <h3>🐝 The governed swarm — parallel, but verified</h3>
+  <p>The decompose → parallel → synthesize pattern, placed under the trust spine. Privileged sub-tasks are gated, never auto-run; the synthesis is scored too.</p>
+<pre>agent-os <span class="k">swarm</span> <span class="o">"research the top 5 local LLM runtimes; compare license, RAM, speed in a table"</span>
+<span class="c">🐝 3 sub-tasks · 2 done · 1 gated · 0 failed
+   - [PASS 89] summarize ...        - [GATED:WRITE] delete the prod database
+   Synthesis scored 88.8</span></pre>
+
+  <h3>🩺 doctor — which model can my machine run?</h3>
+  <p>Detects your hardware and recommends the largest local model that comfortably fits, with the exact one-liner to enable it.</p>
+<pre>agent-os <span class="k">doctor</span>
+<span class="c">Machine : Apple Silicon · 16 GB · Metal
+✅ Recommended: llama3.1:8b
+   export AGENT_OS_PROVIDER=ollama:llama3.1:8b</span></pre>
+
+  <h3>🛡️ Trust &amp; Governance — tamper-evident by default</h3>
+  <p>Every command is hash-chained into an audit log; any edit or deletion breaks the chain and is detectable. The risk classifier is default-deny and tool-aware. A global error boundary means you never see a raw stack trace.</p>
+<pre>agent-os cmd <span class="o">"/risk make the prod table empty"</span>   <span class="c"># → WRITE → REQUIRES APPROVAL</span>
+agent-os cmd <span class="o">"/audit"</span>                            <span class="c"># → chain ✅ intact</span></pre>
+
+  <h3>🧩 Skills — incl. the open SKILL.md standard</h3>
+  <p>Reusable <code class="inline">SKILL.md</code> procedures the agent matches and injects into your model's prompt. Compatible with the open Agent Skills format, so you can point at any skills folder and import it with no code — and it runs on whatever model you've configured.</p>
+<pre><span class="o">export</span> AGENT_OS_SKILLS_PATH=<span class="o">"/path/to/any/skills"</span>
+agent-os cmd <span class="o">"/skills"</span></pre>
+</div></section>
+
+<!-- COMMANDS -->
+<section id="commands"><div class="wrap">
+  <h2>Command <span class="em">surface</span></h2>
+  <p class="lede">One transport-agnostic command set — the same from the CLI, the web UI, and (later) chat.</p>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr><td><code>/ping</code> · <code>/status</code> · <code>/health</code></td><td>liveness, recent jobs, detailed health checks</td></tr>
+    <tr><td><code>/learn &lt;path|text&gt;</code></td><td>ingest notes/files into the Brain</td></tr>
+    <tr><td><code>/ask &lt;question&gt;</code></td><td>answer from your knowledge base (grounded + scored)</td></tr>
+    <tr><td><code>/run &lt;task&gt;</code></td><td>read-only auto-runs; write/send/deploy is gated for approval</td></tr>
+    <tr><td><code>/swarm &lt;goal&gt;</code></td><td>decompose → parallel sub-jobs → synthesize one deliverable</td></tr>
+    <tr><td><code>/doctor</code> · <code>/model</code></td><td>recommend a local model · show the configured provider</td></tr>
+    <tr><td><code>/risk &lt;task&gt;</code></td><td>show the risk classification for a task</td></tr>
+    <tr><td><code>/pending</code> · <code>/approve &lt;id&gt;</code> · <code>/reject &lt;id&gt;</code></td><td>the approval queue for privileged actions</td></tr>
+    <tr><td><code>/audit</code></td><td>recent audit entries + chain integrity</td></tr>
+    <tr><td><code>/agents</code> · <code>/skills</code> · <code>/eval</code></td><td>profiles · skills · run the evaluation suite</td></tr>
+    <tr><td><code>/job &lt;id&gt;</code> · <code>/trace &lt;id&gt;</code></td><td>inspect a persisted job and its trajectory + score</td></tr>
+    <tr><td><code>/digest</code></td><td>synthesize a cross-episode insight digest</td></tr>
+  </table>
+  <p class="muted" style="margin-top:14px">CLI verbs: <code class="inline">run</code>, <code class="inline">cmd</code>, <code class="inline">ui</code>, <code class="inline">doctor</code>, <code class="inline">swarm</code>, <code class="inline">skills</code>, <code class="inline">memory</code>, <code class="inline">health</code>, <code class="inline">supervise</code>, <code class="inline">daily-eval</code>.</p>
+</div></section>
+
+<!-- PRINCIPLES -->
+<section id="principles"><div class="wrap">
+  <h2>Principles</h2>
+  <p class="lede">The non-negotiables that make agent-os different.</p>
+  <div class="prin"><div class="dot"></div><div><b>Local-first, dependency-light.</b> <span class="muted">SQLite + standard library at the core; heavy infrastructure is optional and pluggable.</span></div></div>
+  <div class="prin"><div class="dot"></div><div><b>Pluggable, never faked.</b> <span class="muted">You bring the model and the transports; agent-os ships the structure, gating, and scoring. No bundled keys, no hidden calls, no stubbed integrations.</span></div></div>
+  <div class="prin"><div class="dot"></div><div><b>Default-deny autonomy.</b> <span class="muted">Read-only auto-runs; anything ambiguous or that writes/sends/deploys needs human approval.</span></div></div>
+  <div class="prin"><div class="dot"></div><div><b>Everything leaves a trace, a score, and an improvement.</b> <span class="muted">That's how the system compounds — and how you can trust it.</span></div></div>
+</div></section>
+
+<!-- DOCS -->
+<section id="docs"><div class="wrap">
+  <h2>Go <span class="em">deeper</span></h2>
+  <div class="grid g3">
+    <div class="card"><h3><a href="https://github.com/gagans23/agent-os/blob/main/docs/architecture.md">Architecture</a></h3><p class="muted">Diagrams + the full module map.</p></div>
+    <div class="card"><h3><a href="https://github.com/gagans23/agent-os/blob/main/docs/brain.md">The Brain</a></h3><p class="muted">Ingestion, retrieval, grounding, hybrid search.</p></div>
+    <div class="card"><h3><a href="https://github.com/gagans23/agent-os/blob/main/docs/providers.md">Model onboarding</a></h3><p class="muted">Providers, the doctor, opt-in wiring.</p></div>
+    <div class="card"><h3><a href="https://github.com/gagans23/agent-os/blob/main/docs/orchestrator.md">The governed swarm</a></h3><p class="muted">Decompose → parallel → synthesize, verified.</p></div>
+    <div class="card"><h3><a href="https://github.com/gagans23/agent-os/blob/main/docs/skills.md">Skills</a></h3><p class="muted">SKILL.md, the open standard, import.</p></div>
+    <div class="card"><h3><a href="https://github.com/gagans23/agent-os/blob/main/docs/install-and-ui.md">Install + UI</a></h3><p class="muted">The installer and the local web UI.</p></div>
+    <div class="card"><h3><a href="https://github.com/gagans23/agent-os/blob/main/docs/roadmap.md">Roadmap</a></h3><p class="muted">What's done and what's planned.</p></div>
+    <div class="card"><h3><a href="https://github.com/gagans23/agent-os/blob/main/SECURITY.md">Security</a></h3><p class="muted">Threat model + known limitations.</p></div>
+    <div class="card"><h3><a href="https://github.com/gagans23/agent-os/blob/main/docs/code-review.md">Engineering</a></h3><p class="muted">How we review and keep quality up.</p></div>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <p>agent-os — built bit by bit, governed by default. Apache-2.0.<br/>
+  <a href="https://github.com/gagans23/agent-os">github.com/gagans23/agent-os</a> ·
+  uses <a href="https://github.com/gagans23/ninja-harness">Ninja Harness</a> as its evaluation gate.</p>
+  <p class="muted" style="font-size:12.5px">Live integrations (WhatsApp/Meta, Gmail, Cloudflare, GitHub publish) are pluggable adapters you wire with your own credentials — none are bundled or faked.</p>
+</div></footer>
+
+</body>
+</html>
