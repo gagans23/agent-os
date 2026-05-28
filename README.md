@@ -2,6 +2,8 @@
 
 **A self-improving agent platform that uses [Ninja Harness](https://github.com/gagans23/ninja-harness) as its evaluation gate.**
 
+🌐 **Website / docs:** **[gagans23.github.io/agent-os](https://gagans23.github.io/agent-os/)**
+
 agent-os is the *runtime* layer — command routing, agent profiles, persistent
 memory, a reusable skill library, full trace recording, and a propose-only
 self-improvement loop. Ninja Harness is the *evaluation/certification* layer it
