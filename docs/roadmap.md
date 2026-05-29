@@ -21,7 +21,7 @@ same governed spine.
 
 | # | Module | Pillar | Status |
 |---|---|---|---|
-| 0 | **Trust & Governance** | track · audit · gate · cost | ✅ memory, jobs, traces, skills, profiles, risk (default-deny + tool-aware), approvals, **tamper-evident audit**, eval gate, reliability/supervisor/health, **cost/latency/token metering** (`metering.py`, `/cost`) |
+| 0 | **Trust & Governance** | track · audit · gate · cost | ✅ memory, jobs, traces, skills, profiles, risk (default-deny + tool-aware, **pluggable policy**), approvals, **tamper-evident audit**, eval gate, reliability/supervisor/health, **cost/latency/token metering** (`metering.py`, `/cost`), **composable hooks** (`hooks.py`, built-in secret redaction) |
 | 1 | **The Brain** 🧠 | self-aware context (your notes/files) | ✅ `context.py` ingest→retrieve, `/learn` `/ask`, grounded + scored (Ahaan-maths demo) |
 | 2 | **Model onboarding** | plug Claude/OpenAI/Ollama/Replit | ✅ `providers.py` — Ollama-first, stdlib HTTP (no SDK), one env var (`AGENT_OS_PROVIDER`); powers reasoner/embedder/agent_fn; hybrid semantic search in the Brain; `/model`; **`agent-os doctor`** hardware-aware model advisor (`doctor.py`) |
 | 3 | **Easy install + UI** | "click a button"; non-technical install | ✅ `install.sh` one-command (local venv, no sudo) + `webui.py` minimal local web UI (`agent-os ui`, stdlib, localhost) over the same governed router |
@@ -31,7 +31,8 @@ same governed spine.
 
 The deep dives: [the Brain](brain.md) · [model onboarding](providers.md) ·
 [skills & Agent Skills](skills.md) · [install + UI](install-and-ui.md) ·
-[cross-episode insights](insights.md) · [architecture](architecture.md).
+[cross-episode insights](insights.md) · [compose your own](extending.md) ·
+[architecture](architecture.md).
 
 ## Planned capabilities
 

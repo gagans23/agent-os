@@ -131,6 +131,51 @@ def test_risk_command(router) -> None:
     assert "auto-run" in router.handle("/risk summarize the inbox")
 
 
+def test_pluggable_policy_overrides_default(tmp_path) -> None:
+    from agent_os.risk import RiskAssessment, RiskLevel
+
+    def deny_all(command, tools=None):
+        return RiskAssessment(level=RiskLevel.WRITE, requires_approval=True,
+                              reason="org policy: everything needs approval")
+
+    r = CommandRouter(
+        jobs=JobStore(tmp_path / "jobs.db"),
+        memory=AgentMemory(tmp_path / "state"),
+        skills=SkillRegistry("skills"),
+        recorder=TraceRecorder(tmp_path / "traces"),
+        policy=deny_all,
+    )
+    try:
+        # A normally-read-only task is now gated because the custom policy says so.
+        out = r.handle("/run summarize the latest research")
+        assert "Needs approval" in out
+        assert "org policy" in out
+        assert len(r.approvals.list(status="pending")) == 1
+    finally:
+        r.close()
+
+
+def test_default_hooks_redact_persisted_run_output(tmp_path) -> None:
+    def leaky_agent(command, context, job):
+        return "the secret is sk-abcdefghijklmnopqrstuvwx after summarizing the research"
+
+    r = CommandRouter(
+        jobs=JobStore(tmp_path / "jobs.db"),
+        memory=AgentMemory(tmp_path / "state"),
+        skills=SkillRegistry("skills"),
+        recorder=TraceRecorder(tmp_path / "traces"),
+        agent_fn=leaky_agent,
+    )
+    try:
+        r.handle("/run summarize the latest research")
+        # The default redaction hook scrubs the secret before it is persisted.
+        saved = next((tmp_path / "traces").glob("**/final.md")).read_text()
+        assert "sk-abcdefghijklmnopqrstuvwx" not in saved
+        assert "[REDACTED:openai-key]" in saved
+    finally:
+        r.close()
+
+
 def test_run_read_only_auto_executes(router) -> None:
     out = router.handle("/run summarize the latest research")
     assert "auto-run" in out

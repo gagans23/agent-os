@@ -81,10 +81,11 @@ class CommandRouter:
                  skills: SkillRegistry | None = None, recorder: TraceRecorder | None = None,
                  approvals=None, agent_fn=None, suite_path: str | None = None,
                  digest_source=None, reasoner=None, digest_lens: str = "founder/investor",
-                 audit=None, context=None, provider=None) -> None:
+                 audit=None, context=None, provider=None, policy=None, hooks=None) -> None:
         from agent_os.approvals import ApprovalStore
         from agent_os.audit import AuditLog
         from agent_os.context import ContextStore
+        from agent_os.risk import classify_risk
 
         self.jobs = jobs or JobStore()
         self.memory = memory or AgentMemory()
@@ -94,6 +95,13 @@ class CommandRouter:
         self.audit = audit or AuditLog(Path(self.memory.root) / "audit.db")
         self.context = context or ContextStore(Path(self.memory.root) / "context.db")
         self.agent_fn = agent_fn or _default_agent
+        # Pluggable risk policy: any callable(command, tools=None) -> RiskAssessment.
+        # Defaults to the built-in default-deny classifier; swap it to enforce your
+        # own org policy without forking the router. The gate still runs every time.
+        self.policy = policy or classify_risk
+        # Composable hooks (redaction et al.) threaded into every run_job call.
+        # None → run_job uses HookRegistry.default() (redaction on).
+        self.hooks = hooks
         self.suite_path = suite_path
         # Cross-episode digest: supply your feed fetcher + LLM reasoner in production.
         self.digest_source = digest_source or _demo_episodes
@@ -352,7 +360,7 @@ class CommandRouter:
         from agent_os.runner import run_job
         result = run_job(f"ask: {question}", _ask_agent, profile="researcher",
                          memory=self.memory, skills=self.skills, recorder=self.recorder,
-                         jobs=self.jobs, case=case)
+                         jobs=self.jobs, case=case, hooks=self.hooks)
         g = result.result.metric_by_name("grounding") if result.result else None
         gtxt = f" · grounding {g.score:.2f}" if g and g.is_applicable else ""
         return f"{holder['answer']}\n\n[{result.verdict}{gtxt} · Job {result.job_id[-8:]}]"
@@ -461,16 +469,15 @@ class CommandRouter:
         from agent_os.runner import run_job
 
         result = run_job(task, self.agent_fn, profile=profile, memory=self.memory,
-                         skills=self.skills, recorder=self.recorder, jobs=self.jobs)
+                         skills=self.skills, recorder=self.recorder, jobs=self.jobs,
+                         hooks=self.hooks)
         return result, result.summary + f"\n\nJob: {result.job_id[-8:]}"
 
     def _run(self, args: list[str]) -> str:
-        from agent_os.risk import classify_risk
-
         task = " ".join(args).strip()
         if not task:
             return "Usage: /run <task>"
-        assessment = classify_risk(task)
+        assessment = self.policy(task)
         label = "AMBIGUOUS" if assessment.ambiguous else assessment.level.label
         if not assessment.requires_approval:
             result, summary = self._execute(task, self._profile_for("READ_ONLY"))
@@ -505,12 +512,10 @@ class CommandRouter:
         return orch.run(goal).render()
 
     def _risk(self, args: list[str]) -> str:
-        from agent_os.risk import classify_risk
-
         task = " ".join(args).strip()
         if not task:
             return "Usage: /risk <task>"
-        a = classify_risk(task)
+        a = self.policy(task)
         gate = "auto-run" if not a.requires_approval else "REQUIRES APPROVAL"
         return f"Risk: {a.level.label} → {gate}\nReason: {a.reason}"
 

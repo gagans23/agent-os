@@ -48,7 +48,8 @@ agent_os/
   webui.py           — stdlib local web UI (Module 3)
   context.py         — the Brain: knowledge base + BM25/hybrid retrieval (Module 1)
   providers.py       — model onboarding: Ollama/OpenAI/Anthropic/Echo (Module 2)
-  risk.py            — risk classifier (default-deny + tool-aware)
+  risk.py            — risk classifier (default-deny + tool-aware); pluggable via CommandRouter(policy=…)
+  hooks.py           — composable before/after-action hooks (built-in redaction) — see docs/extending.md
   approvals.py       — approval queue
   audit.py           — hash-chained tamper-evident audit log
   jobs.py            — SQLite job store

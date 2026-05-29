@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent_os.agent_memory import AgentMemory
+from agent_os.hooks import HookContext, HookPhase, HookRegistry
 from agent_os.improvement import ImprovementProposal, propose_improvement
 from agent_os.jobs import JobStore
 from agent_os.metering import estimate_tokens
@@ -97,6 +98,7 @@ def run_job(
     case_path: str | None = None,
     case: Any = None,
     evaluate: bool = True,
+    hooks: HookRegistry | None = None,
 ) -> JobResult:
     """Execute one job end-to-end with tracing, evaluation, and an improvement
     proposal. Pure orchestration — no external services are called here.
@@ -107,6 +109,7 @@ def run_job(
     memory = memory or AgentMemory()
     skills = skills or SkillRegistry()
     recorder = recorder or TraceRecorder()
+    hooks = hooks if hooks is not None else HookRegistry.default()
 
     skill = skills.match(command)
     context = memory.context_for(command)
@@ -118,6 +121,11 @@ def run_job(
     if jobs is not None:
         jobs.create(job.job_id, command, profile=prof.name, skill=skill.name if skill else "")
 
+    # BEFORE hooks: may rewrite the context the agent sees (e.g. redact secrets).
+    hctx = HookContext(phase=HookPhase.BEFORE, command=command, profile=prof.name,
+                       job_id=job.job_id, context=context)
+    context = hooks.run_before(hctx).context
+
     _t0 = time.perf_counter()
     try:
         final = agent_fn(command, context, job)
@@ -126,6 +134,13 @@ def run_job(
             jobs.finish(job.job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
         raise
     latency_s = round(time.perf_counter() - _t0, 3)
+
+    # AFTER hooks: may rewrite the output before it's traced/scored/persisted.
+    hctx.phase = HookPhase.AFTER
+    hctx.context = context
+    hctx.output = final
+    final = hooks.run_after(hctx).output or ""
+
     in_tokens = estimate_tokens(f"{command}\n{context}")
     out_tokens = estimate_tokens(final or "")
     job.set_final(final)

@@ -75,3 +75,35 @@ def test_run_job_accepts_inmemory_case(tmp_path) -> None:
                   case=case, **_harness(tmp_path))
     # grounding metric should be applicable because references were supplied
     assert res.result.metric_by_name("grounding").is_applicable
+
+
+def _leaky_agent(command, context, job):
+    return ("Done. Your key is sk-abcdefghijklmnopqrstuvwx — keep it safe. "
+            "Opened the page and saved a report with the extracted stories.")
+
+
+def test_run_job_default_hooks_redact_output(tmp_path) -> None:
+    res = run_job("research the browser demo", _leaky_agent, profile="researcher",
+                  evaluate=False, **_harness(tmp_path))
+    # The default hook registry redacts secrets before the output is persisted.
+    final = (tmp_path / "traces").glob("**/final.md")
+    assert "sk-abcdefghijklmnopqrstuvwx" not in res.summary
+    saved = next(final).read_text()
+    assert "sk-abcdefghijklmnopqrstuvwx" not in saved
+    assert "[REDACTED:openai-key]" in saved
+
+
+def test_run_job_custom_hooks_can_rewrite_context(tmp_path) -> None:
+    from agent_os.hooks import HookPhase, HookRegistry
+
+    seen: dict[str, str] = {}
+
+    def capture(command, context, job):
+        seen["context"] = context
+        return "ok, opened the page and extracted the stories for the report"
+
+    reg = HookRegistry()
+    reg.add_before(lambda c: setattr(c, "context", "INJECTED") if c.phase is HookPhase.BEFORE else None)
+    run_job("research the browser demo", capture, profile="researcher",
+            evaluate=False, hooks=reg, **_harness(tmp_path))
+    assert seen["context"] == "INJECTED"

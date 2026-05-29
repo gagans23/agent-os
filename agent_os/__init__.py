@@ -10,13 +10,21 @@ Gmail, Cloudflare Tunnel) are pluggable adapters you wire with your own
 credentials — none are bundled or faked.
 """
 
-__version__ = "0.12.0"
+__version__ = "0.13.0"
 
 from agent_os.agent_memory import AgentMemory
 from agent_os.approvals import ApprovalStore
 from agent_os.audit import AuditLog
 from agent_os.command_router import CommandRouter
 from agent_os.context import ContextStore
+from agent_os.hooks import (
+    Hook,
+    HookContext,
+    HookPhase,
+    HookRegistry,
+    redact_secrets,
+    redaction_hook,
+)
 from agent_os.improvement import ImprovementProposal, propose_improvement
 from agent_os.insights import (
     CrossEpisodeSynthesizer,
@@ -55,6 +63,10 @@ __all__ = [
     "Digest",
     "EchoProvider",
     "EpisodeSummary",
+    "Hook",
+    "HookContext",
+    "HookPhase",
+    "HookRegistry",
     "ImprovementProposal",
     "Insight",
     "JobRecorder",
@@ -81,5 +93,7 @@ __all__ = [
     "get_provider",
     "propose_improvement",
     "provider_from_env",
+    "redact_secrets",
+    "redaction_hook",
     "run_job",
 ]
