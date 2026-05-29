@@ -8,6 +8,45 @@ grades them — kept deliberately separate.
 
 ---
 
+## 0. The stack at a glance
+
+Read it top-to-bottom. **You** build the transports and domain workflows on top;
+**you** plug in the model at the bottom (even a free local one). In between,
+agent-os is the **governed harness** — the trustworthy middle that turns every
+request into a traced, scored, risk-gated action. Swap any layer; the guarantees
+in the middle never move.
+
+```mermaid
+flowchart TB
+    subgraph YOU["① You — what you build"]
+        APP["Your transports & workflows<br/>CLI · local Web UI · chat adapters · domain tasks"]
+    end
+    subgraph SPINE["② The spine — one governed entry point"]
+        CR["Command Router<br/>transport-agnostic · audited on every call"]
+    end
+    subgraph HARNESS["③ The governed harness — traced → scored → risk-gated → improved"]
+        direction LR
+        BRAIN["🧠 The Brain<br/>ingest · retrieve · ground"]
+        SKILLS["🧩 Skills & Profiles<br/>SKILL.md · researcher/operator/builder/qa"]
+        SWARM["🐝 The Swarm<br/>decompose · parallel · synthesize"]
+        GOV["🛡️ Governance<br/>risk gate · approvals · audit · eval · hooks · metering · memory"]
+    end
+    subgraph MODELS["④ Models — bring your own (one env var)"]
+        direction LR
+        OLLAMA["Ollama<br/>local & free"]
+        OPENAI["OpenAI"]
+        ANTH["Anthropic / Claude"]
+        ECHO["Echo<br/>deterministic default"]
+    end
+    YOU <--> SPINE
+    SPINE --> HARNESS
+    HARNESS --> MODELS
+```
+
+The same shape powers the live site's [**Anatomy**](https://gagans23.github.io/agent-os/#anatomy) diagram.
+
+---
+
 ## 1. The end-to-end pipeline
 
 Every command flows through the same path: authorize → route → classify risk →

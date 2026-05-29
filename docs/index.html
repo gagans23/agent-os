@@ -67,6 +67,40 @@
   .node b{display:block;font-size:13px;color:var(--fg)} .node span{font-size:11px;color:var(--muted)}
   .arrow{align-self:center;color:var(--accent);font-weight:700}
   .gatebox{border:1px dashed var(--accent);border-radius:10px;padding:8px 12px;background:rgba(59,130,246,.06)}
+  /* anatomy stack (the layered architecture) */
+  .stack{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+  .cap{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);
+    text-align:center;margin-bottom:7px}
+  .appbar{border:1px dashed var(--line);border-radius:12px;padding:14px;text-align:center;
+    background:var(--card)}
+  .appbar b{font-size:15px;color:var(--fg)} .appbar span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+  .vlink{display:flex;justify-content:center;color:var(--accent);font-size:20px;line-height:.8;margin:-2px 0}
+  .sdkbar{background:#070a10;border:1px solid var(--accent);border-radius:12px;padding:15px;text-align:center;
+    box-shadow:inset 0 0 0 1px rgba(59,130,246,.12)}
+  .sdkbar b{font-size:17px;color:#fff} .sdkbar span{display:block;font-size:12.5px;color:var(--muted);margin-top:3px}
+  .harness{border:1px solid var(--line);border-radius:14px;padding:16px;
+    background:linear-gradient(180deg,#10151d,#0d1117)}
+  .harness .htitle{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+    flex-wrap:wrap;margin-bottom:12px}
+  .harness .htitle b{font-size:14px} .harness .htitle .meta{font-size:11.5px;color:var(--accent2)}
+  .hbody{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media(max-width:880px){.hbody{grid-template-columns:1fr 1fr}}
+  @media(max-width:520px){.hbody{grid-template-columns:1fr}}
+  .pillar{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .pillar h4{margin:0 0 9px;font-size:13.5px;display:flex;align-items:center;gap:6px;color:var(--fg)}
+  .pillar ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+  .pillar li{font-size:11.5px;color:var(--muted);background:var(--card2);border:1px solid var(--line);
+    border-radius:7px;padding:5px 8px}
+  .pillar.gov{border-color:rgba(34,211,238,.35);background:linear-gradient(180deg,#101a20,#0d1117)}
+  .pillar.gov h4{color:var(--accent2)}
+  .modelrow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media(max-width:880px){.modelrow{grid-template-columns:1fr 1fr}}
+  .model{border-radius:10px;padding:12px 14px;background:linear-gradient(135deg,#e8a06a,#d9854c);color:#241405}
+  .model b{display:block;font-size:14px;color:#241405} .model span{font-size:11px;color:#4a3115}
+  .model.free{background:linear-gradient(135deg,#7ee0b0,#4fc792);color:#063026}
+  .model.free b{color:#063026} .model.free span{color:#0c4636}
+  .model.det{background:var(--card2);border:1px solid var(--line);color:var(--fg)}
+  .model.det b{color:var(--fg)} .model.det span{color:var(--muted)}
   /* table */
   table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
   th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
@@ -84,6 +118,7 @@
   <span class="brand">🤖 agent-os</span>
   <span class="links">
     <a href="#what">What</a>
+    <a href="#anatomy">Anatomy</a>
     <a href="#quickstart">Quickstart</a>
     <a href="#pipeline">How it works</a>
     <a href="#modules">Modules</a>
@@ -128,6 +163,69 @@
     <div class="card"><span class="pill">Safe</span><h3>Default-deny autonomy</h3>
       <p class="muted">Read-only tasks auto-run; anything that writes, sends, or deploys — or is ambiguous — is gated for your approval. Nothing privileged slips through.</p></div>
   </div>
+</div></section>
+
+<!-- ANATOMY -->
+<section id="anatomy"><div class="wrap">
+  <h2>Anatomy of <span class="em">agent-os</span></h2>
+  <p class="lede">One layered picture of the whole system. Your transports sit on top;
+    your model plugs in at the bottom; in between, a <b>governed harness</b> turns every
+    request into a traced, scored, risk-gated action. You build the unique top and bottom —
+    agent-os is the trustworthy middle.</p>
+
+  <div class="stack">
+    <!-- top: you -->
+    <div>
+      <div class="cap">You — what you build</div>
+      <div class="appbar"><b>Your transports &amp; workflows</b>
+        <span>CLI · local Web UI · chat (WhatsApp/Slack adapters) · your domain tasks</span></div>
+    </div>
+    <div class="vlink">↕</div>
+
+    <!-- spine: command router -->
+    <div>
+      <div class="cap">The spine — one governed entry point</div>
+      <div class="sdkbar"><b>Command Router</b>
+        <span>transport-agnostic · audited on every call · returns plain text</span></div>
+    </div>
+    <div class="vlink">↓</div>
+
+    <!-- harness -->
+    <div>
+      <div class="cap">The governed harness</div>
+      <div class="harness">
+        <div class="htitle"><b>Capabilities</b>
+          <span class="meta">every action: traced → scored → risk-gated → improved</span></div>
+        <div class="hbody">
+          <div class="pillar"><h4>🧠 The Brain</h4>
+            <ul><li>Ingest notes &amp; files</li><li>BM25 + semantic retrieval</li><li>Ground &amp; cite answers</li></ul></div>
+          <div class="pillar"><h4>🧩 Skills &amp; Profiles</h4>
+            <ul><li>Open <code class="inline">SKILL.md</code> import</li><li>researcher · operator · builder · qa</li><li>Prompt injection per task</li></ul></div>
+          <div class="pillar"><h4>🐝 The Swarm</h4>
+            <ul><li>Decompose a goal</li><li>Bounded-parallel sub-jobs</li><li>Synthesize one deliverable</li></ul></div>
+          <div class="pillar gov"><h4>🛡️ Governance</h4>
+            <ul><li>Risk gate (default-deny)</li><li>Approvals queue</li><li>Hash-chained audit</li><li>Eval gate (Ninja Harness)</li><li>Hooks (secret redaction)</li><li>Cost &amp; token metering</li><li>Persistent memory</li></ul></div>
+        </div>
+      </div>
+    </div>
+    <div class="vlink">↓</div>
+
+    <!-- models -->
+    <div>
+      <div class="cap">Models — bring your own (one env var)</div>
+      <div class="modelrow">
+        <div class="model free"><b>Ollama</b><span>local &amp; free · no API key</span></div>
+        <div class="model"><b>OpenAI</b><span>gpt-4o-mini &amp; others</span></div>
+        <div class="model"><b>Anthropic</b><span>Claude models</span></div>
+        <div class="model det"><b>Echo</b><span>deterministic · offline default</span></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="muted" style="margin-top:16px">Read it top-to-bottom: a request enters through any
+    transport, the <b>Command Router</b> authorizes and audits it, the <b>harness</b> runs it through the
+    capabilities under the governance spine, and a <b>model you chose</b> does the thinking — even a
+    free local one. Swap any layer; the guarantees in the middle never move.</p>
 </div></section>
 
 <!-- QUICKSTART -->
