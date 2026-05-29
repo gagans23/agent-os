@@ -10,7 +10,7 @@ Gmail, Cloudflare Tunnel) are pluggable adapters you wire with your own
 credentials — none are bundled or faked.
 """
 
-__version__ = "0.13.0"
+__version__ = "0.14.0"
 
 from agent_os.agent_memory import AgentMemory
 from agent_os.approvals import ApprovalStore
@@ -33,6 +33,7 @@ from agent_os.insights import (
     Insight,
 )
 from agent_os.jobs import JobStore
+from agent_os.onboarding import SetupResult, guidance, run_setup
 from agent_os.orchestrator import Orchestrator, SubResult, SubTask, SwarmResult
 from agent_os.profiles import PROFILES, AgentProfile, get_profile
 from agent_os.providers import (
@@ -42,8 +43,11 @@ from agent_os.providers import (
     OpenAIProvider,
     Provider,
     ProviderError,
+    config_path,
+    configured_provider_spec,
     get_provider,
     provider_from_env,
+    set_configured_provider,
 )
 from agent_os.reasoners import LLMReasoner
 from agent_os.risk import RiskAssessment, RiskLevel, classify_risk
@@ -81,6 +85,7 @@ __all__ = [
     "ProviderError",
     "RiskAssessment",
     "RiskLevel",
+    "SetupResult",
     "Skill",
     "SkillRegistry",
     "SubResult",
@@ -89,11 +94,16 @@ __all__ = [
     "TraceRecorder",
     "__version__",
     "classify_risk",
+    "config_path",
+    "configured_provider_spec",
     "get_profile",
     "get_provider",
+    "guidance",
     "propose_improvement",
     "provider_from_env",
     "redact_secrets",
     "redaction_hook",
     "run_job",
+    "run_setup",
+    "set_configured_provider",
 ]

@@ -60,6 +60,7 @@ agent_os/
   profiles.py        — researcher/operator/builder/qa
   orchestrator.py    — the governed swarm: decompose → parallel → synthesize (Module 6)
   doctor.py          — hardware-aware model advisor (`agent-os doctor`, `/doctor`)
+  onboarding.py      — guided "click a button" setup (`agent-os setup` / `setup --run`, `/setup`); persists provider choice to ~/.agent-os/config.json (never installs Ollama itself)
   metering.py        — cost/latency/token accounting (`/cost`); est. tokens + pricing table
   insights.py / reasoners.py — cross-episode digest + LLM reasoner adapter
   improvement.py     — propose-only improvement proposals

@@ -59,7 +59,8 @@ pip install -e ".[dev]"                                                         
 ## Run it: the web UI 🖥️ ("click a button")
 
 ```bash
-agent-os doctor      # detect your hardware → recommends a local model to run
+agent-os setup       # guided steps to a working local model (prints commands; changes nothing)
+agent-os setup --run # also pulls the model + remembers your choice (never installs Ollama for you)
 agent-os ui          # opens http://127.0.0.1:8765 (auto-picks a free port if busy)
 ```
 
@@ -70,9 +71,12 @@ traced, scored, audited, and risk-gated. The startup prints the exact URL; if th
 port is taken it falls back to the next free one. 📐
 [docs/install-and-ui.md](docs/install-and-ui.md)
 
-> **`agent-os doctor`** answers "which model can my machine run?" — it detects RAM /
-> Apple-Silicon / NVIDIA VRAM and recommends a local model + the exact
-> `export AGENT_OS_PROVIDER=...` line. (Also `/doctor` in the UI.)
+> **`agent-os setup`** is the one-stop guided flow: it detects your machine, tells you
+> the exact steps to a working local model, and with `--run` pulls the model and
+> remembers your choice in `~/.agent-os/config.json` (no shell-profile editing). It
+> never installs Ollama for you — that stays an explicit command you run, per
+> default-deny. The UI shows the same steps as a first-time empty-state when no model
+> is configured. (`agent-os doctor` / `/doctor` give just the hardware → model advice.)
 
 ## Try the loop (no external services)
 

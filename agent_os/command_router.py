@@ -156,6 +156,7 @@ class CommandRouter:
             "audit": lambda a: self._audit(),
             "model": lambda a: self._model(),
             "doctor": lambda a: self._doctor(),
+            "setup": lambda a: self._setup(),
             "cost": lambda a: self._cost(),
             "job": self._job,
             "trace": self._trace,
@@ -198,6 +199,7 @@ class CommandRouter:
             "  /audit           recent audit entries + chain integrity\n"
             "  /model           show the configured model provider\n"
             "  /doctor          detect hardware + recommend a local model\n"
+            "  /setup           guided setup steps to a working local model\n"
             "  /cost            cost · latency · token usage across recent runs\n"
             "  /job <id>        show a job record\n"
             "  /trace <id>      show a job's trace summary\n"
@@ -396,6 +398,17 @@ class CommandRouter:
         from agent_os.doctor import diagnose, render
 
         return render(diagnose())
+
+    def _setup(self) -> str:
+        """Read-only guided setup: the exact steps to a working local model.
+        Execution (pulling a model, persisting the choice) stays CLI-only —
+        `agent-os setup --run` — so nothing privileged runs from a chat surface."""
+        from agent_os import onboarding
+
+        text = onboarding.guidance()
+        if self.provider is None:
+            return text
+        return (f"Model already configured: {self.provider.name} ✅\n\n" + text)
 
     def _cost(self) -> str:
         """Cost / latency / token usage rolled up across recent runs."""

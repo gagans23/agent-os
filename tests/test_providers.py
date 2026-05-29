@@ -36,11 +36,57 @@ def test_get_provider_rejects_unknown_and_empty() -> None:
         get_provider("")
 
 
-def test_provider_from_env(monkeypatch) -> None:
+def test_provider_from_env(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AGENT_OS_HOME", str(tmp_path))   # isolate the config file
     monkeypatch.delenv("AGENT_OS_PROVIDER", raising=False)
     assert provider_from_env() is None                  # opt-in: unset → no provider
     monkeypatch.setenv("AGENT_OS_PROVIDER", "echo")
     assert isinstance(provider_from_env(), EchoProvider)
+
+
+# --- persistent provider config (for non-technical setup) -------------------
+
+def test_config_path_honors_agent_os_home(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AGENT_OS_HOME", str(tmp_path))
+    assert providers.config_path() == tmp_path / "config.json"
+
+
+def test_set_and_read_config_roundtrip(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AGENT_OS_HOME", str(tmp_path))
+    path = providers.set_configured_provider("ollama:llama3.2:3b")
+    assert path.exists()
+    assert providers.read_config()["provider"] == "ollama:llama3.2:3b"
+    assert providers.configured_provider_spec() == "ollama:llama3.2:3b"
+
+
+def test_set_configured_provider_validates_spec(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AGENT_OS_HOME", str(tmp_path))
+    with pytest.raises(ProviderError):
+        providers.set_configured_provider("nope:bad")
+    assert not providers.config_path().exists()         # nothing persisted on bad spec
+
+
+def test_env_overrides_persisted_config(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AGENT_OS_HOME", str(tmp_path))
+    providers.set_configured_provider("ollama:llama3")
+    monkeypatch.setenv("AGENT_OS_PROVIDER", "echo")      # env always wins
+    assert providers.configured_provider_spec() == "echo"
+    assert isinstance(provider_from_env(), EchoProvider)
+
+
+def test_provider_from_env_falls_back_to_config(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AGENT_OS_HOME", str(tmp_path))
+    monkeypatch.delenv("AGENT_OS_PROVIDER", raising=False)
+    providers.set_configured_provider("echo")           # persisted, no env var
+    assert isinstance(provider_from_env(), EchoProvider)
+
+
+def test_read_config_degrades_silently_on_corrupt(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AGENT_OS_HOME", str(tmp_path))
+    cfg = providers.config_path()
+    cfg.parent.mkdir(parents=True, exist_ok=True)
+    cfg.write_text("{not json")
+    assert providers.read_config() == {}                # never raises
 
 
 # --- echo (offline, deterministic) ------------------------------------------

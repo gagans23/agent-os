@@ -29,7 +29,19 @@ def test_ping(router) -> None:
 
 def test_help_and_unknown(router) -> None:
     assert "/status" in router.handle("/help")
+    assert "/setup" in router.handle("/help")
     assert "Unknown command" in router.handle("/nope")
+
+
+def test_setup_is_read_only_guidance(router, monkeypatch) -> None:
+    # /setup returns step-by-step guidance; it never executes (execution is
+    # CLI-only via `agent-os setup --run`, per default-deny).
+    from agent_os import onboarding
+
+    monkeypatch.setattr(onboarding, "guidance",
+                        lambda *a, **k: "🚀 step 1 … ollama pull llama3.2:3b")
+    out = router.handle("/setup")
+    assert "ollama pull" in out
 
 
 def test_agents_lists_profiles(router) -> None:

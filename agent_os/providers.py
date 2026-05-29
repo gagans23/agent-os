@@ -41,6 +41,7 @@ import urllib.error
 import urllib.request
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from pathlib import Path
 
 Complete = Callable[[str], str]
 Embedder = Callable[[list[str]], list[list[float]]]
@@ -267,10 +268,47 @@ def get_provider(spec: str) -> Provider:
     return builder(model.strip())
 
 
-def provider_from_env(var: str = "AGENT_OS_PROVIDER") -> Provider | None:
-    """Return the configured provider, or None if the env var is unset.
+# --- persistent configuration (for non-technical setup) -------------------
+# The env var is still the source of truth and overrides everything. But a
+# non-technical user shouldn't have to manage shell profiles, so `agent-os setup`
+# can persist the chosen provider to a small JSON file we fall back to. This is
+# still explicit user configuration — it never enables a model on its own.
 
-    This is the opt-in switch: with no provider configured, callers stay in
-    deterministic mode and agent-os makes no model calls."""
-    spec = os.environ.get(var)
+def config_path() -> Path:
+    """Where the persisted provider lives. Override the base with AGENT_OS_HOME."""
+    base = os.environ.get("AGENT_OS_HOME")
+    return (Path(base) if base else Path.home() / ".agent-os") / "config.json"
+
+
+def read_config() -> dict:
+    try:
+        return json.loads(config_path().read_text())
+    except Exception:  # noqa: BLE001 - missing/corrupt config must degrade silently
+        return {}
+
+
+def configured_provider_spec(var: str = "AGENT_OS_PROVIDER") -> str | None:
+    """The active provider spec: the env var if set, else the persisted config."""
+    return os.environ.get(var) or (read_config().get("provider") or None)
+
+
+def set_configured_provider(spec: str) -> Path:
+    """Persist `spec` (e.g. 'ollama:llama3.1:8b') to the config file. Returns the
+    path written. Validates the spec first so we never persist garbage."""
+    get_provider(spec)  # raises ProviderError on a bad spec
+    path = config_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cfg = read_config()
+    cfg["provider"] = spec
+    path.write_text(json.dumps(cfg, indent=2) + "\n")
+    return path
+
+
+def provider_from_env(var: str = "AGENT_OS_PROVIDER") -> Provider | None:
+    """Return the configured provider, or None if nothing is configured.
+
+    Resolution order: the env var (always wins), then the persisted config file
+    written by `agent-os setup`. With neither set, callers stay in deterministic
+    mode and agent-os makes no model calls."""
+    spec = configured_provider_spec(var)
     return get_provider(spec) if spec else None

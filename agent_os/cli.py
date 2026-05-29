@@ -144,6 +144,17 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_setup(args: argparse.Namespace) -> int:
+    """Guided 'click a button' setup. Without --run it only explains + prints
+    commands (changes nothing). With --run it pulls the model and remembers your
+    provider choice — but never installs Ollama itself (that stays your call)."""
+    from agent_os import onboarding
+
+    res = onboarding.run_setup(execute=args.run, model=args.model)
+    return 0 if (not args.run or res.verified or res.model_present
+                 or "ollama-install-needed" in res.steps) else 2
+
+
 def _cmd_swarm(args: argparse.Namespace) -> int:
     """Run a goal as a governed parallel swarm (decompose → parallel → synthesize)."""
     from agent_os.orchestrator import Orchestrator
@@ -221,6 +232,13 @@ def main(argv: list[str] | None = None) -> int:
 
     p_doc = sub.add_parser("doctor", help="Detect hardware + recommend a local model.")
     p_doc.set_defaults(func=_cmd_doctor)
+
+    p_set = sub.add_parser("setup", help="Guided setup to a working local model (click-a-button flow).")
+    p_set.add_argument("--run", action="store_true",
+                       help="Also pull the model + remember your provider choice "
+                            "(never installs Ollama itself).")
+    p_set.add_argument("--model", default=None, help="Override the recommended model tag.")
+    p_set.set_defaults(func=_cmd_setup)
 
     p_sw = sub.add_parser("swarm", help="Run a goal as a governed parallel swarm.")
     p_sw.add_argument("goal")

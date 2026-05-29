@@ -57,6 +57,12 @@ PAGE = """<!doctype html>
         padding:14px; overflow:auto; min-height:90px; white-space:pre-wrap;
         word-break:break-word; font-size:13px; line-height:1.45; }
   .muted { color: var(--muted); }
+  #onboard { display:none; border-color: var(--warn); }
+  #onboard h2 { color: var(--warn); }
+  #onboard pre { background:#0b0e13; border:1px solid var(--line); border-radius:8px;
+        padding:12px; white-space:pre-wrap; font-size:12.5px; line-height:1.5; margin:0 0 10px; }
+  #onboard code { background:#0b0e13; border:1px solid var(--line); border-radius:6px;
+        padding:1px 6px; font-size:12px; }
 </style>
 </head>
 <body>
@@ -67,12 +73,23 @@ PAGE = """<!doctype html>
   </header>
   <div id="status">loading…</div>
 
+  <div class="card" id="onboard">
+    <h2>🚀 First-time setup — get to a working local model</h2>
+    <p class="hint">agent-os works right now in <strong>demo mode</strong> (deterministic,
+      no model). Plugging in a free local model via Ollama makes <code>Ask</code> and
+      <code>Run</code> smart. These steps run in your terminal — the UI never installs
+      software or pulls models for you.</p>
+    <pre id="onboard-steps">checking your machine…</pre>
+    <p class="hint">After <code>agent-os setup --run</code> finishes, reload this page.</p>
+  </div>
+
   <div class="row">
     <button onclick="send('/status')">Status</button>
     <button onclick="send('/health')">Health</button>
     <button onclick="send('/agents')">Agents</button>
     <button onclick="send('/skills')">Skills</button>
     <button onclick="send('/model')">Model</button>
+    <button onclick="send('/setup')">Setup</button>
     <button onclick="send('/doctor')">Doctor</button>
     <button onclick="send('/cost')">Cost</button>
     <button onclick="send('/audit')">Audit</button>
@@ -153,12 +170,26 @@ function ask(){ const v=document.getElementById('ask').value.trim(); if(v) send(
 function run(){ const v=document.getElementById('run').value.trim(); if(v) send('/run '+v); }
 function swarm(){ const v=document.getElementById('swarm').value.trim(); if(v) send('/swarm '+v); }
 
+async function api(command){
+  const r = await fetch('/api/cmd', {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({command})});
+  return (await r.json()).output || '';
+}
+
 // Populate the status line on load.
-fetch('/api/cmd', {method:'POST', headers:{'Content-Type':'application/json'},
-  body: JSON.stringify({command:'/status'})})
-  .then(r=>r.json()).then(j=>{document.getElementById('status').textContent =
-    (j.output||'').split('\\n').slice(0,2).join('  ·  ');})
+api('/status').then(out=>{document.getElementById('status').textContent =
+    out.split('\\n').slice(0,2).join('  ·  ');})
   .catch(()=>{document.getElementById('status').textContent='(could not load status)';});
+
+// First-time setup: if no model is configured, show the guided empty-state.
+api('/model').then(out=>{
+  if (out.includes('none configured')) {
+    document.getElementById('onboard').style.display = 'block';
+    api('/setup').then(steps=>{
+      document.getElementById('onboard-steps').textContent = steps;
+    });
+  }
+}).catch(()=>{});
 </script>
 </body>
 </html>"""

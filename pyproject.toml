@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-os"
-version = "0.13.0"
+version = "0.14.0"
 description = "A self-improving agent platform that uses Ninja Harness as its evaluation gate."
 readme = "README.md"
 requires-python = ">=3.11"
