@@ -76,11 +76,18 @@ PAGE = """<!doctype html>
   <div class="card" id="onboard">
     <h2>🚀 First-time setup — get to a working local model</h2>
     <p class="hint">agent-os works right now in <strong>demo mode</strong> (deterministic,
-      no model). Plugging in a free local model via Ollama makes <code>Ask</code> and
-      <code>Run</code> smart. These steps run in your terminal — the UI never installs
-      software or pulls models for you.</p>
+      no model). Plug in a free local model to make <code>Ask</code> and <code>Run</code>
+      smart — one click, no terminal.</p>
+    <div id="onboard-ready" style="display:none">
+      <button class="primary" id="setup-btn" onclick="setupRun()">⬇️ Pull recommended model &amp; enable</button>
+      <span class="hint" id="setup-note" style="margin-left:8px"></span>
+    </div>
+    <div id="onboard-install" style="display:none">
+      <p class="hint">First install <strong>Ollama</strong> (free; a normal app installer —
+        no terminal): <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com/download</a>.
+        Open it once, then reload this page and click the button.</p>
+    </div>
     <pre id="onboard-steps">checking your machine…</pre>
-    <p class="hint">After <code>agent-os setup --run</code> finishes, reload this page.</p>
   </div>
 
   <div class="row">
@@ -183,13 +190,45 @@ api('/status').then(out=>{document.getElementById('status').textContent =
 
 // First-time setup: if no model is configured, show the guided empty-state.
 api('/model').then(out=>{
-  if (out.includes('none configured')) {
-    document.getElementById('onboard').style.display = 'block';
-    api('/setup').then(steps=>{
-      document.getElementById('onboard-steps').textContent = steps;
-    });
-  }
+  if (!out.includes('none configured')) return;        // already set up
+  document.getElementById('onboard').style.display = 'block';
+  api('/setup').then(steps=>{
+    document.getElementById('onboard-steps').textContent = steps;
+  });
+  // Is Ollama installed? Show the one-click button, else the install link.
+  api('/doctor').then(doc=>{
+    const installed = !/Ollama\\s*:\\s*NOT installed/i.test(doc);
+    document.getElementById('onboard-ready').style.display = installed ? 'block' : 'none';
+    document.getElementById('onboard-install').style.display = installed ? 'none' : 'block';
+  });
 }).catch(()=>{});
+
+// One-click, no-terminal model setup: pull the recommended model + remember it.
+async function setupRun(){
+  const btn = document.getElementById('setup-btn');
+  const note = document.getElementById('setup-note');
+  const log = document.getElementById('onboard-steps');
+  btn.disabled = true;
+  note.textContent = 'Pulling the model… this can take a few minutes the first time. Keep this tab open.';
+  log.textContent = 'starting…';
+  try {
+    const r = await fetch('/api/setup', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({})});
+    const j = await r.json();
+    if (j.error){ note.textContent = 'Setup failed: ' + j.error; btn.disabled = false; return; }
+    log.textContent = j.output || '(no output)';
+    if (j.verified || (j.model_present && j.persisted)){
+      note.textContent = '✅ Ready: ' + (j.provider || 'model enabled') + '. Reloading…';
+      setTimeout(()=>location.reload(), 1600);
+    } else if (!j.ollama_installed){
+      document.getElementById('onboard-ready').style.display = 'none';
+      document.getElementById('onboard-install').style.display = 'block';
+    } else {
+      note.textContent = 'Not finished — see the steps below.';
+      btn.disabled = false;
+    }
+  } catch(e){ note.textContent = 'Request failed: ' + e; btn.disabled = false; }
+}
 </script>
 </body>
 </html>"""
@@ -213,16 +252,28 @@ def _make_handler(router) -> type[http.server.BaseHTTPRequestHandler]:
                 self._send(404, json.dumps({"error": "not found"}))
 
         def do_POST(self) -> None:  # noqa: N802 - http.server API
-            if urlparse(self.path).path != "/api/cmd":
+            path = urlparse(self.path).path
+            if path not in ("/api/cmd", "/api/setup"):
                 self._send(404, json.dumps({"error": "not found"}))
                 return
             length = int(self.headers.get("Content-Length", 0) or 0)
             raw = self.rfile.read(length).decode("utf-8") if length else "{}"
             try:
-                command = str(json.loads(raw or "{}").get("command", "")).strip()
-            except (ValueError, AttributeError):
+                body = json.loads(raw or "{}")
+            except ValueError:
                 self._send(400, json.dumps({"error": "invalid JSON body"}))
                 return
+            if path == "/api/setup":
+                # Explicit user action: pull the recommended model + remember the
+                # choice (no terminal). Synchronous — the pull can take minutes the
+                # first time; the browser waits. Never installs Ollama itself.
+                model = (str(body.get("model") or "").strip() or None)
+                try:
+                    self._send(200, json.dumps(router.run_onboarding(model)))
+                except Exception as exc:  # noqa: BLE001 - report, don't crash the UI
+                    self._send(500, json.dumps({"error": f"{type(exc).__name__}: {exc}"}))
+                return
+            command = str(body.get("command", "")).strip()
             if not command:
                 self._send(400, json.dumps({"error": "empty command"}))
                 return

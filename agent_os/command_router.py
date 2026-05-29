@@ -401,14 +401,57 @@ class CommandRouter:
 
     def _setup(self) -> str:
         """Read-only guided setup: the exact steps to a working local model.
-        Execution (pulling a model, persisting the choice) stays CLI-only —
-        `agent-os setup --run` — so nothing privileged runs from a chat surface."""
+        The chat/`/setup` surface never executes — it only explains. Execution is
+        an explicit user action: `agent-os setup --run` (CLI) or the 'Pull model'
+        button in the local UI, which call `run_onboarding()` below."""
         from agent_os import onboarding
 
         text = onboarding.guidance()
         if self.provider is None:
             return text
         return (f"Model already configured: {self.provider.name} ✅\n\n" + text)
+
+    def run_onboarding(self, model: str | None = None) -> dict:
+        """Execute guided setup — pull the recommended model + persist the choice —
+        and re-bind the live provider so the UI works without a restart.
+
+        This is the one execution path outside the CLI, and it is reached ONLY by
+        an explicit user action (the local UI's 'Pull model' button = a human
+        approving their own setup). It is a local, reversible, no-secret action,
+        not an agent task — so it sits beside the default-deny gate, not under it.
+        It still NEVER installs the Ollama binary itself; if Ollama is missing the
+        returned steps say so and nothing is pulled. Read-only surfaces (chat,
+        `/setup`) never reach here."""
+        from agent_os import onboarding
+
+        lines: list[str] = []
+        res = onboarding.run_setup(execute=True, model=model, writer=lines.append)
+        if res.persisted_to:                       # re-bind so /ask + /run go smart now
+            try:
+                from agent_os.providers import provider_from_env
+                self.provider = provider_from_env()
+                if self.provider is not None:
+                    self.agent_fn = self.provider.as_agent_fn()
+                    self.reasoner = self.provider.as_reasoner()
+                    try:
+                        self.context.embedder = self.provider.as_embedder()
+                        self.context.reindex_embeddings()
+                    except Exception:  # noqa: BLE001 - embeddings optional
+                        pass
+            except Exception:  # noqa: BLE001 - a bad spec must not break the UI
+                pass
+        self.audit.record(f"/setup --run {model or ''}".strip(), actor="webui",
+                          decision="verified" if res.verified else "setup-run")
+        return {
+            "output": "\n".join(lines),
+            "verified": res.verified,
+            "persisted": bool(res.persisted_to),
+            "model_present": res.model_present,
+            "ollama_installed": res.ollama_installed,
+            "ollama_running": res.ollama_running,
+            "steps": res.steps,
+            "provider": self.provider.name if self.provider else None,
+        }
 
     def _cost(self) -> str:
         """Cost / latency / token usage rolled up across recent runs."""

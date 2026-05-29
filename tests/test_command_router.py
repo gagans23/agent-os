@@ -44,6 +44,32 @@ def test_setup_is_read_only_guidance(router, monkeypatch) -> None:
     assert "ollama pull" in out
 
 
+def test_run_onboarding_executes_and_rebinds(router, monkeypatch) -> None:
+    # The explicit-action path (UI 'Pull model' button) DOES execute — but only
+    # through this method, never via the read-only /setup command surface.
+    import agent_os.providers as providers_mod
+    from agent_os import onboarding
+    from agent_os.onboarding import SetupResult
+
+    def fake_run_setup(*, execute, model=None, writer=print, **k):
+        assert execute is True                      # the button always executes
+        writer("pulling llama3.2:3b…")
+        writer("done")
+        return SetupResult(
+            recommended="llama3.2:3b", provider_spec="ollama:llama3.2:3b",
+            ollama_installed=True, ollama_running=True, model_present=True,
+            executed=True, persisted_to="/tmp/config.json", verified=True,
+            steps=["model-pulled", "persisted", "verified"],
+        )
+
+    monkeypatch.setattr(onboarding, "run_setup", fake_run_setup)
+    monkeypatch.setattr(providers_mod, "provider_from_env", lambda *a, **k: None)
+    res = router.run_onboarding()
+    assert res["verified"] is True and res["persisted"] is True
+    assert "pulling llama3.2:3b…" in res["output"]
+    assert res["steps"] == ["model-pulled", "persisted", "verified"]
+
+
 def test_agents_lists_profiles(router) -> None:
     out = router.handle("/agents")
     assert "researcher" in out and "operator" in out and "qa" in out

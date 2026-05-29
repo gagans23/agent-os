@@ -54,6 +54,35 @@ def _post(port: int, command: str):
 def test_page_contains_expected_elements() -> None:
     assert "agent-os" in PAGE
     assert "/api/cmd" in PAGE and "Teach the brain" in PAGE
+    # The no-terminal first-time setup affordances are present.
+    assert "/api/setup" in PAGE and "Pull recommended model" in PAGE
+
+
+def test_api_setup_pulls_and_persists(server, monkeypatch) -> None:
+    # The 'Pull model' button hits /api/setup → router.run_onboarding(). Stub the
+    # actual pull so no real `ollama` runs; assert the endpoint returns its result.
+    from agent_os import onboarding
+    from agent_os.onboarding import SetupResult
+
+    def fake_run_setup(*, execute, model=None, writer=print, **k):
+        writer("pulling…")
+        return SetupResult(
+            recommended="llama3.2:3b", provider_spec="ollama:llama3.2:3b",
+            ollama_installed=True, ollama_running=True, model_present=True,
+            executed=True, persisted_to="/tmp/config.json", verified=True,
+            steps=["model-pulled", "persisted", "verified"],
+        )
+
+    monkeypatch.setattr(onboarding, "run_setup", fake_run_setup)
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{server}/api/setup",
+        data=json.dumps({}).encode(), headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=10) as r:
+        body = json.loads(r.read())
+    assert r.status == 200
+    assert body["verified"] is True and body["persisted"] is True
+    assert "pulling…" in body["output"]
 
 
 def test_serves_index(server) -> None:

@@ -71,6 +71,13 @@ traced, scored, audited, and risk-gated. The startup prints the exact URL; if th
 port is taken it falls back to the next free one. 📐
 [docs/install-and-ui.md](docs/install-and-ui.md)
 
+> **No-terminal model setup.** The first time you open the UI with no model
+> configured, it shows a setup card with a **"Pull recommended model"** button —
+> one click detects Ollama, pulls the right model for your machine, remembers the
+> choice, and reloads smart. No commands to type. (It never installs Ollama itself
+> — if it's missing, the card links the normal app installer. Same flow on the CLI:
+> `agent-os setup --run`.)
+
 > **`agent-os setup`** is the one-stop guided flow: it detects your machine, tells you
 > the exact steps to a working local model, and with `--run` pulls the model and
 > remembers your choice in `~/.agent-os/config.json` (no shell-profile editing). It
