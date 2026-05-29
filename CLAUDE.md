@@ -76,6 +76,12 @@ agent-os ui                 # local web UI at http://127.0.0.1:8765
 python examples/ahaan_maths_demo.py
 ```
 
+No-terminal path for non-technical users: double-click a launcher in `launchers/`
+(macOS `.command` / Windows `.bat` / Linux `.sh`) — it bootstraps via `install.sh`
+then opens the UI; then one click "Pull recommended model" in the UI. See
+`docs/no-terminal.md`. (A signed single-file `.app`/`.exe` needs the user's own
+Apple/MS cert → intentionally out of scope.)
+
 ## Modules / status (see docs/roadmap.md)
 
 - **0 Trust & Governance** ✅ — risk default-deny + tool-aware, hash-chained audit,
