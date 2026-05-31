@@ -51,21 +51,42 @@ def _post(port: int, command: str):
         return r.status, json.loads(r.read())
 
 
+def _get(port: int, path: str):
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=5) as r:
+        return r.status, json.loads(r.read())
+
+
 def test_page_contains_expected_elements() -> None:
     assert "agent-os" in PAGE
     assert "/api/cmd" in PAGE and "Teach the brain" in PAGE
     # The no-terminal first-time setup affordances are present.
     assert "/api/setup" in PAGE and "Pull recommended model" in PAGE
+    # Live background-progress UI (poll loop + progress bar) is wired in.
+    assert "/api/setup/status" in PAGE and "pollSetup" in PAGE
+    assert 'id="live-bar"' in PAGE and 'id="onboard-live"' in PAGE
+    # The button is labeled from the read-only plan (instant vs. download).
+    assert "/api/setup/plan" in PAGE
 
 
-def test_api_setup_pulls_and_persists(server, monkeypatch) -> None:
-    # The 'Pull model' button hits /api/setup → router.run_onboarding(). Stub the
-    # actual pull so no real `ollama` runs; assert the endpoint returns its result.
+def test_api_setup_plan_is_read_only_preview(server) -> None:
+    status, body = _get(server, "/api/setup/plan")
+    assert status == 200
+    # Either a real plan (model + flags) or a graceful error — never a 500.
+    assert "model" in body or "error" in body
+
+
+def test_api_setup_starts_background_job_and_status_polls(server, monkeypatch) -> None:
+    # The 'Pull model' button hits /api/setup, which now starts a BACKGROUND job
+    # and returns immediately; the UI polls /api/setup/status for live progress.
+    # Stub the pull so no real `ollama` runs.
+    import time
+
     from agent_os import onboarding
     from agent_os.onboarding import SetupResult
 
-    def fake_run_setup(*, execute, model=None, writer=print, **k):
-        writer("pulling…")
+    def fake_run_setup(*, execute, model=None, writer=print, shell=None, **k):
+        writer("② Pulling…")
+        writer("pulling manifest 100%")
         return SetupResult(
             recommended="llama3.2:3b", provider_spec="ollama:llama3.2:3b",
             ollama_installed=True, ollama_running=True, model_present=True,
@@ -78,11 +99,21 @@ def test_api_setup_pulls_and_persists(server, monkeypatch) -> None:
         f"http://127.0.0.1:{server}/api/setup",
         data=json.dumps({}).encode(), headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=10) as r:
-        body = json.loads(r.read())
-    assert r.status == 200
+    with urllib.request.urlopen(req, timeout=5) as r:
+        started = json.loads(r.read())
+    assert r.status == 200 and started["state"] == "running"   # returned at once
+
+    # Poll the status endpoint like the browser does, until the job finishes.
+    deadline = time.time() + 5
+    body = started
+    while time.time() < deadline:
+        _, body = _get(server, "/api/setup/status")
+        if body["state"] in ("done", "error"):
+            break
+        time.sleep(0.05)
+    assert body["state"] == "done"
     assert body["verified"] is True and body["persisted"] is True
-    assert "pulling…" in body["output"]
+    assert any("Pulling" in ln for ln in body["lines"])
 
 
 def test_serves_index(server) -> None:

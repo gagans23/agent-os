@@ -60,7 +60,7 @@ agent_os/
   profiles.py        — researcher/operator/builder/qa
   orchestrator.py    — the governed swarm: decompose → parallel → synthesize (Module 6)
   doctor.py          — hardware-aware model advisor (`agent-os doctor`, `/doctor`)
-  onboarding.py      — guided "click a button" setup (`agent-os setup` / `setup --run`, `/setup`); persists provider choice to ~/.agent-os/config.json (never installs Ollama itself)
+  onboarding.py      — guided "click a button" setup (`agent-os setup` / `setup --run`, `/setup`); persists provider choice to ~/.agent-os/config.json (never installs Ollama itself). UI pull runs as a BACKGROUND job (router.start_onboarding → daemon thread; `/api/setup` returns at once, `/api/setup/status` polled for live progress; `/api/setup/plan` previews the pick). doctor.smart_pick prefers an already-downloaded capable model (instant enable) and offers the hardware recommendation as an optional upgrade
   metering.py        — cost/latency/token accounting (`/cost`); est. tokens + pricing table
   insights.py / reasoners.py — cross-episode digest + LLM reasoner adapter
   improvement.py     — propose-only improvement proposals
@@ -77,10 +77,16 @@ python examples/ahaan_maths_demo.py
 ```
 
 No-terminal path for non-technical users: double-click a launcher in `launchers/`
-(macOS `.command` / Windows `.bat` / Linux `.sh`) — it bootstraps via `install.sh`
-then opens the UI; then one click "Pull recommended model" in the UI. See
-`docs/no-terminal.md`. (A signed single-file `.app`/`.exe` needs the user's own
-Apple/MS cert → intentionally out of scope.)
+(macOS `agent-os.app` / Windows `.bat` / Linux `.sh`) — it bootstraps via
+`install.sh` then opens the UI; then one click "Pull recommended model" in the UI.
+On macOS the `.app` is the reliable entry: it's a thin, inspectable wrapper
+(plist + readable shell script at `agent-os.app/Contents/MacOS/agent-os`) that
+runs `agent-os-macos.command` via `open -a Terminal` — because a bare `.command`
+often does *nothing* on double-click (missing LaunchServices association). The
+`.command` stays as a fallback. See `docs/no-terminal.md`. (A *signed,
+self-contained* `.app`/`.exe` needs the user's own Apple/MS cert → out of scope;
+the bundled `.app` is unsigned and built from the user's own checkout, so no
+download quarantine.)
 
 ## Modules / status (see docs/roadmap.md)
 

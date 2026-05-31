@@ -59,10 +59,11 @@ pip install -e ".[dev]"                                                         
 ## Run it: the web UI 🖥️ ("click a button")
 
 **No terminal?** Double-click the launcher for your system in **`launchers/`**
-(`agent-os-macos.command` · `agent-os-windows.bat` · `agent-os-linux.sh`). It sets
-up a local environment on first run, then opens the UI in your browser — you type
-nothing. Full walkthrough (incl. the one-click model setup):
-**[docs/no-terminal.md](docs/no-terminal.md)**.
+(macOS `agent-os.app` · Windows `agent-os-windows.bat` · Linux `agent-os-linux.sh`).
+It sets up a local environment on first run, then opens the UI in your browser —
+you type nothing. (On macOS use `agent-os.app`; a bare `.command` often does
+nothing on double-click because of a missing file association.) Full walkthrough
+(incl. the one-click model setup): **[docs/no-terminal.md](docs/no-terminal.md)**.
 
 Prefer the terminal?
 

@@ -22,6 +22,9 @@ Read-only by design. No approvals, sends, or self-modification here.
 from __future__ import annotations
 
 import json
+import re
+import subprocess
+import threading
 from pathlib import Path
 
 from agent_os import __version__
@@ -128,6 +131,16 @@ class CommandRouter:
                 self.context.reindex_embeddings()
             except Exception:  # noqa: BLE001 - embeddings are optional; degrade to keyword
                 pass
+        # Background onboarding (the UI's "Pull recommended model" button). The
+        # model pull can be many GB / minutes, so it runs in a daemon thread and
+        # the UI polls onboarding_status() for live progress — never a blocking
+        # request. Guarded by a lock; the HTTP server stays single-threaded.
+        self._onboard_lock = threading.Lock()
+        self._onboard_thread: threading.Thread | None = None
+        self._onboard: dict = {
+            "state": "idle", "phase": "", "pct": None, "lines": [], "model": None,
+            "verified": False, "persisted": False, "provider": None, "error": None,
+        }
 
     # --- dispatch ----------------------------------------------------------
 
@@ -452,6 +465,152 @@ class CommandRouter:
             "steps": res.steps,
             "provider": self.provider.name if self.provider else None,
         }
+
+    # --- background onboarding (live progress for the UI) -------------------
+
+    @staticmethod
+    def _stream_shell(cmd: list[str], writer) -> int:
+        """Run a command, streaming output as it arrives. Unlike a line-buffered
+        read, this splits on both '\\n' and '\\r' so `ollama pull`'s in-place
+        progress updates (which use carriage returns) surface live, line by line."""
+        try:
+            proc = subprocess.Popen(  # noqa: S603 - fixed argv, no shell
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1,
+            )
+        except FileNotFoundError:
+            writer(f"(command not found: {cmd[0]})")
+            return 127
+        assert proc.stdout is not None
+        buf = ""
+        while True:
+            chunk = proc.stdout.read(80)
+            if not chunk:
+                break
+            buf += chunk
+            while True:
+                idx = min((buf.find(c) for c in "\r\n" if c in buf), default=-1)
+                if idx < 0:
+                    break
+                line, buf = buf[:idx], buf[idx + 1:]
+                if line.strip():
+                    writer(line.strip())
+        if buf.strip():
+            writer(buf.strip())
+        return proc.wait()
+
+    def onboarding_plan(self) -> dict:
+        """A cheap, read-only preview of what one-click setup will do: which model
+        gets enabled, whether it's already downloaded (instant) or needs a pull,
+        and any optional upgrade. Lets the UI label the button honestly. Read-only
+        — diagnoses hardware/Ollama, changes nothing."""
+        from agent_os import doctor
+
+        d = doctor.diagnose()
+        pick = doctor.smart_pick(d)
+        return {
+            "model": pick.model,
+            "already_present": pick.already_present,
+            "upgrade": pick.upgrade,
+            "ollama_installed": d.ollama_installed,
+            "ollama_running": d.ollama_running,
+            "configured": self.provider is not None,
+        }
+
+    def onboarding_status(self) -> dict:
+        """A thread-safe snapshot of the background setup job, for UI polling."""
+        with self._onboard_lock:
+            snap = dict(self._onboard)
+            snap["lines"] = list(self._onboard["lines"])[-12:]
+            snap["done"] = snap["state"] in ("done", "error")
+            snap["running"] = snap["state"] == "running"
+            return snap
+
+    def start_onboarding(self, model: str | None = None) -> dict:
+        """Kick off the model pull + enable in a background thread and return
+        immediately. The UI polls onboarding_status() to render live progress.
+
+        Same governance as run_onboarding(): an explicit user button-click (human
+        approval of their own local setup), audited, never installs Ollama itself.
+        Idempotent — a second click while running just returns the live status."""
+        with self._onboard_lock:
+            if self._onboard["state"] == "running":
+                snap = dict(self._onboard)
+                snap["lines"] = list(self._onboard["lines"])[-12:]
+                snap["done"] = False
+                snap["running"] = True
+                return snap
+            self._onboard = {
+                "state": "running", "phase": "Checking your machine…", "pct": None,
+                "lines": [], "model": model, "verified": False, "persisted": False,
+                "provider": None, "error": None,
+            }
+        # Audit the intent from the serving thread (keeps SQLite single-threaded).
+        try:
+            self.audit.record(f"/setup --run {model or ''}".strip(), actor="webui",
+                              decision="setup-start")
+        except Exception:  # noqa: BLE001 - auditing must not block setup
+            pass
+        t = threading.Thread(target=self._onboard_worker, args=(model,), daemon=True)
+        self._onboard_thread = t
+        t.start()
+        return self.onboarding_status()
+
+    def _onboard_set(self, **kw) -> None:
+        with self._onboard_lock:
+            self._onboard.update(kw)
+
+    def _onboard_write(self, line: str) -> None:
+        """Writer for the background pull: append the log line and derive a
+        human-readable phase + percentage so the UI can show a real progress bar."""
+        with self._onboard_lock:
+            self._onboard["lines"].append(line)
+            m = re.search(r"(\d{1,3})%", line)
+            if m:
+                self._onboard["pct"] = max(0, min(100, int(m.group(1))))
+            low = line.lower()
+            if line.startswith("②") or "pulling" in low or "downloading" in low:
+                self._onboard["phase"] = "Downloading the model…"
+            elif line.startswith("③") or "saved your choice" in low:
+                self._onboard["phase"] = "Enabling it…"
+            elif line.startswith("④") or "verifying" in low or "model says" in low:
+                self._onboard["phase"] = "Verifying…"
+
+    def _onboard_worker(self, model: str | None) -> None:
+        from agent_os import onboarding
+
+        try:
+            res = onboarding.run_setup(
+                execute=True, model=model, writer=self._onboard_write,
+                shell=self._stream_shell,
+            )
+            if res.persisted_to:                    # re-bind so /ask + /run go smart now
+                try:
+                    from agent_os.providers import provider_from_env
+                    self.provider = provider_from_env()
+                    if self.provider is not None:
+                        self.agent_fn = self.provider.as_agent_fn()
+                        self.reasoner = self.provider.as_reasoner()
+                        try:
+                            self.context.embedder = self.provider.as_embedder()
+                            self.context.reindex_embeddings()
+                        except Exception:  # noqa: BLE001 - embeddings optional / cross-thread
+                            pass
+                except Exception:  # noqa: BLE001 - a bad spec must not break the UI
+                    pass
+            ready = bool(res.verified or (res.model_present and res.persisted_to))
+            self._onboard_set(
+                state="done",
+                phase="Ready" if ready else "Setup didn't finish",
+                pct=100 if res.model_present else self._onboard.get("pct"),
+                verified=res.verified, persisted=bool(res.persisted_to),
+                model_present=res.model_present, model=res.recommended,
+                provider=self.provider.name if self.provider else None,
+                ollama_installed=res.ollama_installed,
+            )
+        except Exception as exc:  # noqa: BLE001 - surface, never crash the UI thread
+            self._onboard_set(state="error", phase="Something went wrong",
+                              error=f"{type(exc).__name__}: {exc}")
 
     def _cost(self) -> str:
         """Cost / latency / token usage rolled up across recent runs."""

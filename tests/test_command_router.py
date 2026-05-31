@@ -70,6 +70,93 @@ def test_run_onboarding_executes_and_rebinds(router, monkeypatch) -> None:
     assert res["steps"] == ["model-pulled", "persisted", "verified"]
 
 
+def _wait_done(router, timeout=5.0):
+    import time
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        s = router.onboarding_status()
+        if s["state"] in ("done", "error"):
+            return s
+        time.sleep(0.02)
+    raise AssertionError("onboarding did not finish in time")
+
+
+def test_start_onboarding_runs_in_background_with_live_progress(router, monkeypatch) -> None:
+    # The UI button starts a background job; the UI polls onboarding_status().
+    import threading as _t
+
+    import agent_os.providers as providers_mod
+    from agent_os import onboarding
+    from agent_os.onboarding import SetupResult
+
+    release = _t.Event()
+
+    def fake_run_setup(*, execute, model=None, writer=print, shell=None, **k):
+        assert execute is True
+        writer("② Pulling llama3.2:3b…")
+        writer("pulling manifest 100%")
+        release.wait(5)                                 # let the test observe 'running'
+        writer("③ Saved your choice: ollama:llama3.2:3b")
+        writer("④ Verifying…")
+        return SetupResult(
+            recommended="llama3.2:3b", provider_spec="ollama:llama3.2:3b",
+            ollama_installed=True, ollama_running=True, model_present=True,
+            executed=True, persisted_to="/tmp/config.json", verified=True,
+            steps=["model-pulled", "persisted", "verified"],
+        )
+
+    monkeypatch.setattr(onboarding, "run_setup", fake_run_setup)
+    monkeypatch.setattr(providers_mod, "provider_from_env", lambda *a, **k: None)
+
+    first = router.start_onboarding()
+    assert first["state"] == "running"                  # returns without blocking
+    # Live progress is observable while the (blocked) pull is mid-flight.
+    import time
+    time.sleep(0.05)
+    mid = router.onboarding_status()
+    assert mid["running"] is True
+    assert any("Pulling" in ln for ln in mid["lines"])
+    assert mid["pct"] == 100                            # parsed from "...100%"
+
+    release.set()                                       # let the job finish
+    done = _wait_done(router)
+    assert done["state"] == "done"
+    assert done["verified"] is True and done["persisted"] is True
+    assert any("Pulling" in ln for ln in done["lines"])  # streamed log captured
+
+
+def test_onboarding_status_idle_before_start(router) -> None:
+    s = router.onboarding_status()
+    assert s["state"] == "idle" and s["running"] is False and s["done"] is False
+
+
+def test_start_onboarding_error_is_surfaced(router, monkeypatch) -> None:
+    from agent_os import onboarding
+
+    def boom(*a, **k):
+        raise RuntimeError("ollama exploded")
+
+    monkeypatch.setattr(onboarding, "run_setup", boom)
+    router.start_onboarding()
+    s = _wait_done(router)
+    assert s["state"] == "error" and "ollama exploded" in s["error"]
+
+
+def test_stream_shell_splits_on_carriage_returns(router) -> None:
+    # ollama uses '\r' for in-place progress; the streaming shell must surface
+    # each update as its own line so the UI progress bar moves.
+    import sys
+
+    lines: list[str] = []
+    code = router._stream_shell(
+        [sys.executable, "-c",
+         r"import sys; sys.stdout.write('10%\r50%\r100%\ndone\n')"],
+        lines.append,
+    )
+    assert code == 0
+    assert "10%" in lines and "50%" in lines and "100%" in lines and "done" in lines
+
+
 def test_agents_lists_profiles(router) -> None:
     out = router.handle("/agents")
     assert "researcher" in out and "operator" in out and "qa" in out

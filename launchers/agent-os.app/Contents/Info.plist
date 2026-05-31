@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  agent-os.app — a minimal, fully-inspectable macOS launcher.
+
+  This is NOT a compiled/binary app. It is a plain folder: this Info.plist
+  plus a readable shell script at Contents/MacOS/agent-os. Finder treats any
+  folder shaped like this as a double-clickable app, which is why it launches
+  reliably even when a bare ".command" file does nothing (a .command relies on
+  a LaunchServices file-association that is often missing).
+
+  Built locally from your own checkout, so there is no download quarantine and
+  no Gatekeeper "unidentified developer" block. (Code-signing/notarization is
+  only needed to ship a downloaded app — intentionally out of scope.)
+-->
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key>
+  <string>agent-os</string>
+  <key>CFBundleDisplayName</key>
+  <string>agent-os</string>
+  <key>CFBundleExecutable</key>
+  <string>agent-os</string>
+  <key>CFBundleIdentifier</key>
+  <string>dev.agentos.launcher</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleShortVersionString</key>
+  <string>0.17.0</string>
+  <key>CFBundleVersion</key>
+  <string>0.17.0</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>10.13</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <!-- No window of its own; it shows progress in a Terminal window instead. -->
+  <key>LSBackgroundOnly</key>
+  <false/>
+</dict>
+</plist>

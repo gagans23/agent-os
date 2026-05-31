@@ -1,0 +1,34 @@
+#!/bin/bash
+#
+# agent-os.app launcher (macOS) — double-click target.
+#
+# Why this exists: double-clicking a bare ".command" file relies on a
+# LaunchServices association that is frequently missing, so Finder silently
+# does nothing. A ".app" bundle is always launchable, so this runs reliably.
+#
+# What it does: finds the repo, then opens the visible progress launcher
+# (launchers/agent-os-macos.command) in Terminal via `open -a Terminal`, which
+# bypasses the broken ".command" association entirely. You don't type anything;
+# the Terminal window only shows progress, then your browser opens.
+
+set -euo pipefail
+
+# This executable lives at:  <repo>/launchers/agent-os.app/Contents/MacOS/agent-os
+# Walk four levels up to reach the repo root.
+HERE="$(cd "$(dirname "$0")" && pwd)"        # .../Contents/MacOS
+REPO="$(cd "$HERE/../../../.." && pwd)"       # repo root
+
+CMD="$REPO/launchers/agent-os-macos.command"
+
+if [ ! -f "$CMD" ]; then
+  /usr/bin/osascript -e 'display alert "agent-os" message "Could not find launchers/agent-os-macos.command next to this app. Keep agent-os.app inside the agent-os folder."' >/dev/null 2>&1 || true
+  exit 1
+fi
+
+# Make sure the progress launcher is executable (exec bit can be lost on a ZIP
+# download); harmless if it is already +x.
+chmod +x "$CMD" 2>/dev/null || true
+
+# Open it in Terminal so the user sees first-run setup progress. `open -a
+# Terminal <script>` runs the script regardless of the .command association.
+exec /usr/bin/open -a Terminal "$CMD"

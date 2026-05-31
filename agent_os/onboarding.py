@@ -80,7 +80,8 @@ def guidance(diag: doctor.Diagnosis | None = None, model: str | None = None) -> 
     """Pure, read-only setup instructions (no execution). Used by the CLI's dry
     run, the `/setup` command, and the web UI's empty state."""
     d = diag or doctor.diagnose()
-    rec = model or d.recommended or "llama3.2:3b"
+    pick = doctor.smart_pick(d)
+    rec = model or pick.model
     spec = f"ollama:{rec}"
     has_model = rec in d.ollama_models
     lines = ["🚀 agent-os setup — get to a working local model in a few steps", ""]
@@ -102,8 +103,11 @@ def guidance(diag: doctor.Diagnosis | None = None, model: str | None = None) -> 
               f"   …or by hand:  export AGENT_OS_PROVIDER={spec}"]
     # Step 4 — use
     lines += ["4. Use it:  agent-os ui     (or:  agent-os cmd \"/ask ...\")", ""]
-    lines += [f"Recommended for this machine: {spec}",
-              "Tip: agent-os already works with no model (deterministic demo mode) — "
+    lines += [f"Recommended for this machine: {spec}"]
+    if not model and pick.already_present and pick.upgrade:
+        lines += [f"   (using {rec} — already downloaded, so it's instant; "
+                  f"optional upgrade for more quality:  ollama pull {pick.upgrade})"]
+    lines += ["Tip: agent-os already works with no model (deterministic demo mode) — "
               "a model just makes /ask and /run smart."]
     return "\n".join(lines)
 
@@ -120,7 +124,7 @@ def run_setup(*, execute: bool = False, model: str | None = None,
     """
     shell = shell or _default_shell
     d = diag or doctor.diagnose()
-    rec = model or d.recommended or "llama3.2:3b"
+    rec = model or doctor.smart_pick(d).model
     spec = f"ollama:{rec}"
     res = SetupResult(
         recommended=rec, provider_spec=spec,

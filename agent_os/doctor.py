@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import platform
+import re
 import shutil
 import subprocess
 import urllib.request
@@ -121,6 +122,64 @@ def recommend_model(budget_gb: float | None) -> tuple[str, list[str]]:
     fits = [m for m in CATALOG if m[1] <= budget_gb]
     too_big = [m[0] for m in CATALOG if m[1] > budget_gb]
     return (fits[-1][0] if fits else "llama3.2:1b"), too_big
+
+
+def _params_b(tag: str) -> float | None:
+    """Best-effort parameter count (in billions) parsed from an Ollama tag."""
+    m = re.search(r"(\d+(?:\.\d+)?)\s*b\b", tag.lower())
+    return float(m.group(1)) if m else None
+
+
+def est_size_gb(tag: str) -> float | None:
+    """Rough memory footprint for a model tag (Q4-ish). Exact for CATALOG tags,
+    estimated from the parameter count otherwise; None if it can't be guessed."""
+    for t, g, _n in CATALOG:
+        if t == tag:
+            return g
+    p = _params_b(tag)
+    return round(p * 0.7, 1) if p else None
+
+
+@dataclass
+class Pick:
+    """What the one-click UI should actually enable.
+
+    `model` is the choice; `already_present` means no download is needed (instant);
+    `upgrade` is a larger, capability-recommended model not yet downloaded (offered
+    as an optional better-quality pull, not forced on a non-technical user)."""
+    model: str
+    already_present: bool
+    upgrade: str | None = None
+
+
+def smart_pick(d: Diagnosis) -> Pick:
+    """Choose the model to enable on one click. Prefer something already
+    downloaded so a non-technical user isn't stuck on a multi-GB first pull;
+    surface the hardware-recommended model as an optional upgrade.
+
+    Priority:
+      1. the hardware recommendation, if it's already pulled;
+      2. else the largest already-pulled model that fits the memory budget
+         (with the recommendation offered as an upgrade);
+      3. else the recommendation (which will need to be downloaded)."""
+    rec = d.recommended or "llama3.2:3b"
+    present = [
+        m for m in d.ollama_models
+        if m and not m.startswith(d.embed_recommended)   # skip the embedder
+    ]
+    if rec in d.ollama_models:
+        return Pick(rec, True, None)
+
+    def fits(tag: str) -> bool:
+        g = est_size_gb(tag)
+        return d.budget_gb is None or g is None or g <= d.budget_gb
+
+    ranked = sorted((m for m in present if fits(m)),
+                    key=lambda m: (est_size_gb(m) or 0.0), reverse=True)
+    if ranked:
+        best = ranked[0]
+        return Pick(best, True, rec if rec != best else None)
+    return Pick(rec, False, None)
 
 
 def diagnose() -> Diagnosis:

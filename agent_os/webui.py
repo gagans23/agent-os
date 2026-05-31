@@ -63,6 +63,34 @@ PAGE = """<!doctype html>
         padding:12px; white-space:pre-wrap; font-size:12.5px; line-height:1.5; margin:0 0 10px; }
   #onboard code { background:#0b0e13; border:1px solid var(--line); border-radius:6px;
         padding:1px 6px; font-size:12px; }
+  /* Live setup progress ("watch the magic") */
+  #onboard-live { display:none; }
+  .phase { display:flex; align-items:center; gap:10px; font-size:15px; font-weight:600;
+           margin:2px 0 12px; }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--accent);
+         box-shadow:0 0 0 0 rgba(59,130,246,.7); animation:pulse 1.4s infinite; flex:none; }
+  .dot.ok { background:var(--ok); animation:none; box-shadow:none; }
+  .dot.err { background:#f85149; animation:none; box-shadow:none; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(59,130,246,.7);}
+                     70%{box-shadow:0 0 0 12px rgba(59,130,246,0);}
+                     100%{box-shadow:0 0 0 0 rgba(59,130,246,0);} }
+  .bar { height:12px; background:#0b0e13; border:1px solid var(--line);
+         border-radius:999px; overflow:hidden; }
+  .bar > i { display:block; height:100%; width:0%;
+             background:linear-gradient(90deg,#3b82f6,#22d3ee);
+             border-radius:999px; transition:width .5s ease; }
+  .bar.indet > i { width:35% !important; animation:slide 1.2s ease-in-out infinite; }
+  @keyframes slide { 0%{margin-left:-35%;} 100%{margin-left:100%;} }
+  .barwrap { display:flex; align-items:center; gap:10px; margin:4px 0 12px; }
+  .barwrap .pct { font-variant-numeric:tabular-nums; font-size:13px; color:var(--muted);
+                  min-width:42px; text-align:right; }
+  .console { background:#0b0e13; border:1px solid var(--line); border-radius:8px;
+             padding:10px 12px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+             font-size:12px; line-height:1.55; color:#9fb1c1; max-height:140px;
+             overflow:auto; white-space:pre-wrap; word-break:break-word; }
+  .steps { display:flex; gap:14px; flex-wrap:wrap; margin:0 0 12px; font-size:12.5px;
+           color:var(--muted); }
+  .steps b { color:var(--fg); font-weight:600; }
 </style>
 </head>
 <body>
@@ -87,6 +115,23 @@ PAGE = """<!doctype html>
         no terminal): <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com/download</a>.
         Open it once, then reload this page and click the button.</p>
     </div>
+
+    <!-- Live progress: the user watches the agent set itself up, no terminal. -->
+    <div id="onboard-live">
+      <div class="phase"><span class="dot" id="live-dot"></span><span id="live-phase">Starting…</span></div>
+      <div class="barwrap">
+        <div class="bar indet" id="live-bar"><i></i></div>
+        <span class="pct" id="live-pct"></span>
+      </div>
+      <div class="steps" id="live-steps">
+        <span data-k="ollama">① Ollama</span>
+        <span data-k="model">② Model</span>
+        <span data-k="enable">③ Enable</span>
+        <span data-k="verify">④ Verify</span>
+      </div>
+      <div class="console" id="live-log">starting…</div>
+    </div>
+
     <pre id="onboard-steps">checking your machine…</pre>
   </div>
 
@@ -188,46 +233,123 @@ api('/status').then(out=>{document.getElementById('status').textContent =
     out.split('\\n').slice(0,2).join('  ·  ');})
   .catch(()=>{document.getElementById('status').textContent='(could not load status)';});
 
-// First-time setup: if no model is configured, show the guided empty-state.
-api('/model').then(out=>{
-  if (!out.includes('none configured')) return;        // already set up
-  document.getElementById('onboard').style.display = 'block';
-  api('/setup').then(steps=>{
-    document.getElementById('onboard-steps').textContent = steps;
-  });
-  // Is Ollama installed? Show the one-click button, else the install link.
-  api('/doctor').then(doc=>{
-    const installed = !/Ollama\\s*:\\s*NOT installed/i.test(doc);
-    document.getElementById('onboard-ready').style.display = installed ? 'block' : 'none';
-    document.getElementById('onboard-install').style.display = installed ? 'none' : 'block';
-  });
-}).catch(()=>{});
+// First-time setup. If a background pull is already running (e.g. the page was
+// reloaded mid-download), resume the live view. Otherwise show the empty-state.
+function initOnboarding(){
+  fetch('/api/setup/status').then(r=>r.json()).then(s=>{
+    if (s.state === 'running'){            // resume watching the magic
+      document.getElementById('onboard').style.display = 'block';
+      enterLiveMode(); renderSetup(s); pollSetup();
+      return;
+    }
+    api('/model').then(out=>{
+      if (!out.includes('none configured')) return;    // already set up
+      document.getElementById('onboard').style.display = 'block';
+      api('/setup').then(steps=>{
+        document.getElementById('onboard-steps').textContent = steps;
+      });
+      // What will one click do? Label the button honestly (instant vs download).
+      fetch('/api/setup/plan').then(r=>r.json()).then(p=>{
+        const installed = p.ollama_installed !== false;
+        document.getElementById('onboard-ready').style.display = installed ? 'block' : 'none';
+        document.getElementById('onboard-install').style.display = installed ? 'none' : 'block';
+        const btn = document.getElementById('setup-btn');
+        const note = document.getElementById('setup-note');
+        if (p.model && p.already_present){
+          btn.textContent = '⚡ Enable ' + p.model + ' (already downloaded)';
+          note.textContent = p.upgrade
+            ? 'Instant — already on your machine. Bigger option later: ' + p.upgrade + '.'
+            : 'Instant — this model is already on your machine.';
+        } else if (p.model){
+          btn.textContent = '⬇️ Download & enable ' + p.model;
+          note.textContent = 'First download runs in the background — you can watch it here.';
+        }
+      }).catch(()=>{});
+    });
+  }).catch(()=>{});
+}
+initOnboarding();
 
-// One-click, no-terminal model setup: pull the recommended model + remember it.
+function enterLiveMode(){
+  document.getElementById('onboard-ready').style.display = 'none';
+  document.getElementById('onboard-install').style.display = 'none';
+  document.getElementById('onboard-steps').style.display = 'none';
+  document.getElementById('onboard-live').style.display = 'block';
+}
+
+// Map free-text log lines → which of the 4 steps is active, to light them up.
+function markSteps(phase, done){
+  const order = ['ollama','model','enable','verify'];
+  let active = 1;                                   // ② Model by default
+  const p = (phase||'').toLowerCase();
+  if (p.indexOf('enabl') >= 0) active = 2;
+  else if (p.indexOf('verif') >= 0) active = 3;
+  else if (p.indexOf('ready') >= 0 || done) active = 4;
+  document.querySelectorAll('#live-steps span').forEach((el,i)=>{
+    el.innerHTML = el.innerHTML.replace(/^(✅ |▶ )/,'');
+    if (i < active) el.innerHTML = '✅ ' + el.innerHTML;
+    else if (i === active && !done) el.innerHTML = '▶ ' + el.innerHTML;
+  });
+}
+
+function renderSetup(s){
+  const dot = document.getElementById('live-dot');
+  const phaseEl = document.getElementById('live-phase');
+  const bar = document.getElementById('live-bar');
+  const pctEl = document.getElementById('live-pct');
+  const logEl = document.getElementById('live-log');
+  phaseEl.textContent = s.phase || 'Working…';
+  if (typeof s.pct === 'number'){
+    bar.classList.remove('indet');
+    bar.firstElementChild.style.width = s.pct + '%';
+    pctEl.textContent = s.pct + '%';
+  } else if (s.state !== 'running'){
+    bar.classList.remove('indet');
+    bar.firstElementChild.style.width = (s.state==='error'?0:100) + '%';
+    pctEl.textContent = '';
+  }
+  if (s.lines && s.lines.length){ logEl.textContent = s.lines.join('\\n'); logEl.scrollTop = logEl.scrollHeight; }
+  dot.className = 'dot' + (s.state==='done'?' ok':s.state==='error'?' err':'');
+  markSteps(s.phase, s.state!=='running');
+  if (s.state === 'done'){
+    if (s.verified || (s.model_present !== false && s.persisted)){
+      phaseEl.textContent = '✅ Ready — ' + (s.provider || 'model enabled') + '. Reloading…';
+      setTimeout(()=>location.reload(), 1800);
+    } else if (s.ollama_installed === false){
+      document.getElementById('onboard-live').style.display = 'none';
+      document.getElementById('onboard-install').style.display = 'block';
+    } else {
+      phaseEl.textContent = 'Setup didn\\'t finish — see the log below.';
+    }
+  } else if (s.state === 'error'){
+    phaseEl.textContent = 'Error: ' + (s.error || 'unknown');
+  }
+}
+
+let setupTimer = null;
+function pollSetup(){
+  if (setupTimer) return;
+  setupTimer = setInterval(()=>{
+    fetch('/api/setup/status').then(r=>r.json()).then(s=>{
+      renderSetup(s);
+      if (s.state === 'done' || s.state === 'error'){ clearInterval(setupTimer); setupTimer = null; }
+    }).catch(()=>{});
+  }, 700);
+}
+
+// One-click, no-terminal model setup: start the background pull, then watch it.
 async function setupRun(){
-  const btn = document.getElementById('setup-btn');
-  const note = document.getElementById('setup-note');
-  const log = document.getElementById('onboard-steps');
-  btn.disabled = true;
-  note.textContent = 'Pulling the model… this can take a few minutes the first time. Keep this tab open.';
-  log.textContent = 'starting…';
+  document.getElementById('setup-btn').disabled = true;
+  enterLiveMode();
+  document.getElementById('live-phase').textContent = 'Starting…';
+  document.getElementById('live-log').textContent = 'starting…';
   try {
     const r = await fetch('/api/setup', {method:'POST',
       headers:{'Content-Type':'application/json'}, body: JSON.stringify({})});
-    const j = await r.json();
-    if (j.error){ note.textContent = 'Setup failed: ' + j.error; btn.disabled = false; return; }
-    log.textContent = j.output || '(no output)';
-    if (j.verified || (j.model_present && j.persisted)){
-      note.textContent = '✅ Ready: ' + (j.provider || 'model enabled') + '. Reloading…';
-      setTimeout(()=>location.reload(), 1600);
-    } else if (!j.ollama_installed){
-      document.getElementById('onboard-ready').style.display = 'none';
-      document.getElementById('onboard-install').style.display = 'block';
-    } else {
-      note.textContent = 'Not finished — see the steps below.';
-      btn.disabled = false;
-    }
-  } catch(e){ note.textContent = 'Request failed: ' + e; btn.disabled = false; }
+    const s = await r.json();
+    if (s.error){ document.getElementById('live-phase').textContent = 'Setup failed: ' + s.error; return; }
+    renderSetup(s); pollSetup();
+  } catch(e){ document.getElementById('live-phase').textContent = 'Request failed: ' + e; }
 }
 </script>
 </body>
@@ -248,6 +370,16 @@ def _make_handler(router) -> type[http.server.BaseHTTPRequestHandler]:
             path = urlparse(self.path).path
             if path in ("/", "/index.html"):
                 self._send(200, PAGE, "text/html; charset=utf-8")
+            elif path == "/api/setup/status":
+                # Fast, in-memory poll of the background setup job (no blocking).
+                self._send(200, json.dumps(router.onboarding_status()))
+            elif path == "/api/setup/plan":
+                # Read-only preview so the button can be labeled honestly
+                # (instant enable vs. download). Diagnoses hardware; changes nothing.
+                try:
+                    self._send(200, json.dumps(router.onboarding_plan()))
+                except Exception as exc:  # noqa: BLE001 - never break page load
+                    self._send(200, json.dumps({"error": f"{type(exc).__name__}: {exc}"}))
             else:
                 self._send(404, json.dumps({"error": "not found"}))
 
@@ -265,11 +397,12 @@ def _make_handler(router) -> type[http.server.BaseHTTPRequestHandler]:
                 return
             if path == "/api/setup":
                 # Explicit user action: pull the recommended model + remember the
-                # choice (no terminal). Synchronous — the pull can take minutes the
-                # first time; the browser waits. Never installs Ollama itself.
+                # choice (no terminal). Starts a BACKGROUND job and returns at once;
+                # the UI polls /api/setup/status for live progress so the request
+                # never blocks on a multi-GB download. Never installs Ollama itself.
                 model = (str(body.get("model") or "").strip() or None)
                 try:
-                    self._send(200, json.dumps(router.run_onboarding(model)))
+                    self._send(200, json.dumps(router.start_onboarding(model)))
                 except Exception as exc:  # noqa: BLE001 - report, don't crash the UI
                     self._send(500, json.dumps({"error": f"{type(exc).__name__}: {exc}"}))
                 return
