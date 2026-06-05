@@ -59,6 +59,7 @@ agent_os/
   skill_registry.py  — load skills from skills/*/SKILL.md
   profiles.py        — researcher/operator/builder/qa
   orchestrator.py    — the governed swarm: decompose → parallel → synthesize (Module 6)
+  mcp.py             — MCP connector bridge (Module 4): stdlib stdio JSON-RPC client + config (`~/.agent-os/mcp.json`) + MCPRegistry. No SDK, no bundled servers, no creds. Router `/mcp` `/mcp-tools` `/mcp-call` risk-gate every call (tool-aware default-deny), execute via run_job (traced+scored+persisted), route privileged calls through approvals (/approve dispatches stored `/mcp-call`)
   doctor.py          — hardware-aware model advisor (`agent-os doctor`, `/doctor`)
   onboarding.py      — guided "click a button" setup (`agent-os setup` / `setup --run`, `/setup`); persists provider choice to ~/.agent-os/config.json (never installs Ollama itself). UI pull runs as a BACKGROUND job (router.start_onboarding → daemon thread; `/api/setup` returns at once, `/api/setup/status` polled for live progress; `/api/setup/plan` previews the pick). doctor.smart_pick prefers an already-downloaded capable model (instant enable) and offers the hardware recommendation as an optional upgrade
   metering.py        — cost/latency/token accounting (`/cost`); est. tokens + pricing table
@@ -98,9 +99,11 @@ download quarantine.)
   Ollama-first, stdlib HTTP, powers reasoner/embedder/agent_fn; `/model`.
 - **3 Easy install + UI** ✅ — `install.sh` + `webui.py` (`agent-os ui`).
 - **4 Pro-coder + connectors** — 🚧 ✅ open `SKILL.md` compatibility (import via
-  `AGENT_OS_SKILLS_PATH`, recursive/multi-root, model-agnostic injection); next:
-  MCP connector bridge, role packs, knowledge-graph import into the Brain,
-  coding-agent links. See docs/roadmap.md → Planned capabilities.
+  `AGENT_OS_SKILLS_PATH`, recursive/multi-root, model-agnostic injection);
+  ✅ **MCP connector bridge** (`mcp.py` + `/mcp` `/mcp-tools` `/mcp-call`, stdlib
+  stdio JSON-RPC, your own servers in `~/.agent-os/mcp.json`, every call
+  gated+traced+scored+audited — docs/mcp.md); next: role packs, knowledge-graph
+  import into the Brain, coding-agent links. See docs/roadmap.md → Planned capabilities.
 - **5 Watchers + dashboards** — later: folder/event watchers, trend dashboards,
   knowledge-graph view of the Brain.
 - **6 The governed swarm** ✅ — `orchestrator.py`: decompose → bounded-parallel

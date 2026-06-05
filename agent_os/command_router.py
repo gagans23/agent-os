@@ -84,7 +84,8 @@ class CommandRouter:
                  skills: SkillRegistry | None = None, recorder: TraceRecorder | None = None,
                  approvals=None, agent_fn=None, suite_path: str | None = None,
                  digest_source=None, reasoner=None, digest_lens: str = "founder/investor",
-                 audit=None, context=None, provider=None, policy=None, hooks=None) -> None:
+                 audit=None, context=None, provider=None, policy=None, hooks=None,
+                 mcp_registry=None) -> None:
         from agent_os.approvals import ApprovalStore
         from agent_os.audit import AuditLog
         from agent_os.context import ContextStore
@@ -105,6 +106,11 @@ class CommandRouter:
         # Composable hooks (redaction et al.) threaded into every run_job call.
         # None → run_job uses HookRegistry.default() (redaction on).
         self.hooks = hooks
+        # MCP connector bridge (Module 4): your own servers, declared in
+        # ~/.agent-os/mcp.json — agent-os bundles none and stores no credentials.
+        # Built lazily on first use so importing the router costs nothing; every
+        # call still flows through the risk gate + audit log + eval, below.
+        self._mcp_registry = mcp_registry
         self.suite_path = suite_path
         # Cross-episode digest: supply your feed fetcher + LLM reasoner in production.
         self.digest_source = digest_source or _demo_episodes
@@ -175,6 +181,9 @@ class CommandRouter:
             "trace": self._trace,
             "run": self._run,
             "swarm": self._swarm,
+            "mcp": lambda a: self._mcp(),
+            "mcp-tools": self._mcp_tools,
+            "mcp-call": self._mcp_call,
             "risk": self._risk,
             "pending": lambda a: self._pending(),
             "approve": self._approve,
@@ -218,6 +227,9 @@ class CommandRouter:
             "  /trace <id>      show a job's trace summary\n"
             "  /run <task>      submit a task (auto-runs if read-only; else needs approval)\n"
             "  /swarm <goal>    governed swarm: decompose → parallel sub-jobs → synthesize\n"
+            "  /mcp             list your configured MCP connector servers\n"
+            "  /mcp-tools <srv> list a server's tools (with each tool's risk gate)\n"
+            "  /mcp-call <srv> <tool> [json]  call an MCP tool (gated · traced · scored)\n"
             "  /risk <task>     show the risk classification for a task\n"
             "  /pending         list actions awaiting approval\n"
             "  /approve <id>    approve & execute a pending action\n"
@@ -551,10 +563,15 @@ class CommandRouter:
                               decision="setup-start")
         except Exception:  # noqa: BLE001 - auditing must not block setup
             pass
+        # Snapshot the just-set running state BEFORE starting the worker, so the
+        # return value always (and accurately) reports "running" — the call has
+        # started the job. Snapshotting after t.start() would race a fast worker
+        # that finishes before we read back, making the POST look already "done".
+        snap = self.onboarding_status()
         t = threading.Thread(target=self._onboard_worker, args=(model,), daemon=True)
         self._onboard_thread = t
         t.start()
-        return self.onboarding_status()
+        return snap
 
     def _onboard_set(self, **kw) -> None:
         with self._onboard_lock:
@@ -726,6 +743,133 @@ class CommandRouter:
         )
         return orch.run(goal).render()
 
+    # --- Module 4: MCP connector bridge ------------------------------------
+
+    def _mcp_reg(self):
+        """Lazily build the MCP registry from the user's ~/.agent-os/mcp.json.
+        Bundles nothing; if the file is absent the registry is simply empty."""
+        if self._mcp_registry is None:
+            from agent_os.mcp import MCPRegistry
+            self._mcp_registry = MCPRegistry()
+        return self._mcp_registry
+
+    def _mcp(self) -> str:
+        """List the MCP servers the user has declared (read-only)."""
+        reg = self._mcp_reg()
+        names = reg.names()
+        if not names:
+            return (
+                "No MCP servers configured.\n"
+                f"Declare your own in {reg.path} — agent-os bundles none and stores "
+                "no credentials:\n"
+                '  {"servers": {"filesystem": {"command": ["npx","-y",'
+                '"@modelcontextprotocol/server-filesystem","/path"]}}}\n\n'
+                "Then: /mcp-tools <server> to list tools · "
+                "/mcp-call <server> <tool> {json} to call one (gated)."
+            )
+        lines = ["MCP servers (yours — declared in mcp.json):"]
+        for n in names:
+            cfg = reg.get(n)
+            argv = " ".join(cfg.command) if cfg else ""
+            lines.append(f"  {n} — {argv[:64]}")
+        lines.append("\n/mcp-tools <server> · /mcp-call <server> <tool> {json-args}")
+        return "\n".join(lines)
+
+    def _mcp_tools(self, args: list[str]) -> str:
+        """List a server's tools, each tagged with the risk gate it would hit."""
+        if not args:
+            return "Usage: /mcp-tools <server>"
+        name = args[0]
+        reg = self._mcp_reg()
+        if not reg.get(name):
+            return f"No MCP server '{name}'. Try /mcp to list configured servers."
+        from agent_os.mcp import MCPError
+
+        try:
+            tools = reg.list_tools(name)
+        except MCPError as exc:
+            return f"⚠️ Could not list tools from '{name}': {exc}"
+        if not tools:
+            return f"'{name}' exposes no tools."
+        lines = [f"Tools on '{name}' (risk gate previewed per tool):"]
+        for t in tools:
+            tname = str(t.get("name", "?"))
+            a = self.policy(f"mcp {tname}", tools=[tname])
+            gate = "auto-run" if not a.requires_approval else "needs approval"
+            label = "AMBIGUOUS" if a.ambiguous else a.level.label
+            desc = (t.get("description") or "").strip().splitlines()
+            tip = f" — {desc[0][:60]}" if desc else ""
+            lines.append(f"  {tname}  [{label} → {gate}]{tip}")
+        lines.append("\nCall one: /mcp-call " + name + " <tool> {json-args}")
+        return "\n".join(lines)
+
+    def _mcp_call(self, args: list[str]) -> str:
+        """Call an MCP tool through the spine: risk-gated (default-deny), and on
+        auto-run executed via run_job so it's traced + scored + persisted. A
+        write/send/deploy (or ambiguous) tool is enqueued for /approve instead."""
+        if len(args) < 2:
+            return "Usage: /mcp-call <server> <tool> [json-args]"
+        server, tool = args[0], args[1]
+        raw = " ".join(args[2:]).strip()
+        try:
+            arguments = json.loads(raw) if raw else {}
+        except json.JSONDecodeError as exc:
+            return f"⚠️ Invalid JSON args: {exc}. Example: /mcp-call {server} {tool} {{\"path\":\"/tmp\"}}"
+        if not isinstance(arguments, dict):
+            return "⚠️ Tool args must be a JSON object, e.g. {\"path\": \"/tmp\"}."
+        reg = self._mcp_reg()
+        if not reg.get(server):
+            return f"No MCP server '{server}'. Try /mcp to list configured servers."
+
+        assessment = self.policy(f"mcp {tool}", tools=[tool])
+        label = "AMBIGUOUS" if assessment.ambiguous else assessment.level.label
+        if not assessment.requires_approval:
+            result, summary = self._mcp_execute(server, tool, arguments)
+            return f"[risk: {label} → auto-run]\n{summary}\n{self._meter_line(result)}"
+        approval_id = self.approvals.enqueue(
+            f"/mcp-call {server} {tool} {json.dumps(arguments)}",
+            "operator", label, assessment.reason,
+        )
+        return (
+            f"⛔ Needs approval — MCP {label} ({assessment.reason}).\n"
+            f"Server: {server}   Tool: {tool}\n"
+            f"Approve:  /approve {approval_id}\n"
+            f"Reject:   /reject {approval_id}"
+        )
+
+    def _mcp_execute(self, server: str, tool: str, arguments: dict):
+        """Run one MCP tool call inside a traced/scored/persisted job. Returns
+        (JobResult, reply) where the reply shows the tool's actual output (the
+        point of the call) plus the verdict and job id for follow-up."""
+        from agent_os.runner import run_job
+
+        reg = self._mcp_reg()
+        holder: dict[str, str] = {}
+
+        def _mcp_agent(command, context, job):
+            job.add_step("plan", f"Call MCP tool '{tool}' on server '{server}'.")
+            out = reg.call(server, tool, arguments)
+            job.add_tool_call(f"mcp:{server}:{tool}", arguments,
+                              result=(out or "")[:300], status="success")
+            job.add_step("observation", f"Tool returned {len(out or '')} char(s).")
+            holder["out"] = out or "(no output)"
+            return holder["out"]
+
+        result = run_job(f"mcp call {server}/{tool}", _mcp_agent, profile="operator",
+                         memory=self.memory, skills=self.skills, recorder=self.recorder,
+                         jobs=self.jobs, hooks=self.hooks)
+        reply = (f"🔌 {server}/{tool} →\n{holder.get('out', '(no output)')}\n\n"
+                 f"[{result.verdict} · score {result.ninja_score:.1f} · "
+                 f"Job {result.job_id[-8:]}]")
+        return result, reply
+
+    def _dispatch_mcp_command(self, command: str):
+        """Re-run a stored '/mcp-call <server> <tool> <json>' approval command."""
+        parts = command.split(maxsplit=3)
+        server, tool = parts[1], parts[2]
+        arguments = json.loads(parts[3]) if len(parts) > 3 else {}
+        return self._mcp_execute(server, tool, arguments)
+
     def _risk(self, args: list[str]) -> str:
         task = " ".join(args).strip()
         if not task:
@@ -752,7 +896,10 @@ class CommandRouter:
             return f"No approval found matching '{args[0]}'."
         if rec["status"] != "pending":
             return f"Approval {rec['id']} is already {rec['status']}."
-        result, summary = self._execute(rec["command"], rec["profile"])
+        if rec["command"].startswith("/mcp-call "):
+            result, summary = self._dispatch_mcp_command(rec["command"])
+        else:
+            result, summary = self._execute(rec["command"], rec["profile"])
         self.approvals.set_decision(rec["id"], "approved", job_id=result.job_id)
         return f"✅ Approved & executed [{rec['risk_level']}].\n{summary}"
 

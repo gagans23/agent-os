@@ -378,3 +378,103 @@ def test_model_command_with_provider(tmp_path) -> None:
         assert r.context.stats()["embeddings"] >= 1
     finally:
         r.close()
+
+
+# --- Module 4: MCP connector bridge ----------------------------------------
+
+import json as _json  # noqa: E402
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+
+_FAKE_MCP = _Path(__file__).parent / "mcp_fake_server.py"
+
+
+def _mcp_router(tmp_path):
+    """A router wired to the fake MCP server via a tmp mcp.json registry."""
+    from agent_os.mcp import MCPRegistry
+
+    cfg = tmp_path / "mcp.json"
+    cfg.write_text(_json.dumps(
+        {"servers": {"fake": {"command": [_sys.executable, str(_FAKE_MCP)]}}}))
+    return CommandRouter(
+        jobs=JobStore(tmp_path / "jobs.db"),
+        memory=AgentMemory(tmp_path / "state"),
+        skills=SkillRegistry("skills"),
+        recorder=TraceRecorder(tmp_path / "traces"),
+        mcp_registry=MCPRegistry(cfg, timeout=10),
+    )
+
+
+def test_mcp_lists_no_servers_when_unconfigured(tmp_path) -> None:
+    from agent_os.mcp import MCPRegistry
+
+    r = CommandRouter(
+        jobs=JobStore(tmp_path / "jobs.db"),
+        memory=AgentMemory(tmp_path / "state"),
+        skills=SkillRegistry("skills"),
+        recorder=TraceRecorder(tmp_path / "traces"),
+        mcp_registry=MCPRegistry(tmp_path / "absent.json"),
+    )
+    try:
+        out = r.handle("/mcp")
+        assert "No MCP servers configured" in out
+        assert "bundles none" in out  # honest: no servers, no creds bundled
+    finally:
+        r.close()
+
+
+def test_mcp_lists_configured_server_and_tools(tmp_path) -> None:
+    r = _mcp_router(tmp_path)
+    try:
+        assert "fake" in r.handle("/mcp")
+        tools = r.handle("/mcp-tools fake")
+        # Tools listed, each tagged with the gate it would hit.
+        assert "read_note" in tools and "write_note" in tools
+        assert "auto-run" in tools and "needs approval" in tools
+    finally:
+        r.close()
+
+
+def test_mcp_call_read_only_tool_auto_runs_and_is_traced(tmp_path) -> None:
+    r = _mcp_router(tmp_path)
+    try:
+        out = r.handle("/mcp-call fake read_note {\"q\": \"hello\"}")
+        assert "auto-run" in out
+        assert "note says: hello" in out
+        # It ran as a real job (traced/scored/persisted).
+        assert r.jobs.stats()["total"] >= 1
+    finally:
+        r.close()
+
+
+def test_mcp_call_mutating_tool_requires_approval_then_executes(tmp_path) -> None:
+    r = _mcp_router(tmp_path)
+    try:
+        out = r.handle("/mcp-call fake write_note {\"text\": \"hi\"}")
+        assert "Needs approval" in out and "WRITE" in out
+        pending = r.approvals.list(status="pending")
+        assert len(pending) == 1
+        approved = r.handle(f"/approve {pending[0]['id']}")
+        assert "Approved & executed" in approved
+        assert "wrote: hi" in approved
+    finally:
+        r.close()
+
+
+def test_mcp_call_rejects_bad_json(tmp_path) -> None:
+    r = _mcp_router(tmp_path)
+    try:
+        out = r.handle("/mcp-call fake read_note {not json}")
+        assert "Invalid JSON" in out
+        # Nothing ran, nothing queued.
+        assert r.approvals.list(status="pending") == []
+    finally:
+        r.close()
+
+
+def test_mcp_call_unknown_server(tmp_path) -> None:
+    r = _mcp_router(tmp_path)
+    try:
+        assert "No MCP server 'ghost'" in r.handle("/mcp-call ghost read_note {}")
+    finally:
+        r.close()

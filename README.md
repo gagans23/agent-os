@@ -22,7 +22,8 @@ flowchart LR
 📐 **Full diagrams & module map:** [docs/architecture.md](docs/architecture.md) ·
 🗺️ **Modular roadmap (toward a personal agent OS):** [docs/roadmap.md](docs/roadmap.md)
 
-> Status: **v0.11 — the governed swarm 🐝 + hardware model advisor 🩺**, on top of
+> Status: **v0.18 — the MCP connector bridge 🔌**, on top of the governed swarm 🐝
+> + hardware model advisor 🩺,
 > Agent Skills compatibility, a one-command install + local web UI 🖥️, model
 > onboarding (Ollama/OpenAI/Claude), the Brain 🧠, and a tamper-evident governance
 > spine. The three levels (Core · Reliability · Controlled Autonomy) work and are
@@ -236,6 +237,31 @@ Every sub-task is a **real job** (traced, risk-gated, Ninja-scored, queryable vi
 synthesis is scored too. **Local-first, your model, honest concurrency** (a
 bounded pool sized to your machine — no fictional "300"). 📐
 [docs/orchestrator.md](docs/orchestrator.md)
+
+## MCP connector bridge 🔌 — real tools, under the gate (v0.18)
+
+Wire in the open [Model Context Protocol](https://modelcontextprotocol.io)
+ecosystem — filesystem, GitHub, databases, browsers — without re-implementing any
+of it, and **without giving up governance**. You declare your own servers in
+`~/.agent-os/mcp.json` (agent-os bundles none and stores no credentials); every
+call flows through the same spine.
+
+```bash
+agent-os cmd "/mcp"                       # your configured servers
+agent-os cmd "/mcp-tools filesystem"      # tools + the gate each would hit
+agent-os cmd '/mcp-call filesystem read_file {"path": "/etc/hostname"}'
+```
+
+```
+🔌 filesystem/read_file →
+darkstar
+[PASS · score 90.0 · Job 7f3a2c10]
+```
+
+Listing is read-only and auto-runs; a **write/send/deploy** tool (or an ambiguous
+one) is **default-denied** to `/approve` first. Each call is a real job — traced,
+Ninja-scored, persisted, audited. Stdlib-only stdio JSON-RPC (no SDK). 🔒
+[docs/mcp.md](docs/mcp.md)
 
 ## Trust & Governance — tamper-evident by default (v0.6)
 

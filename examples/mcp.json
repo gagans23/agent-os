@@ -1,0 +1,12 @@
+{
+  "_comment": "Copy to ~/.agent-os/mcp.json (or $AGENT_OS_HOME/mcp.json) and edit. agent-os bundles NO MCP server and stores NO credentials — these are your own servers and your own secrets. 'command' may be a list (preferred) or a string. 'env' is merged onto the child process environment only. See docs/mcp.md.",
+  "servers": {
+    "filesystem": {
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/a/folder"]
+    },
+    "github": {
+      "command": "npx -y @modelcontextprotocol/server-github",
+      "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_replace_me"}
+    }
+  }
+}

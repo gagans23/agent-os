@@ -10,7 +10,7 @@ Gmail, Cloudflare Tunnel) are pluggable adapters you wire with your own
 credentials — none are bundled or faked.
 """
 
-__version__ = "0.17.0"
+__version__ = "0.18.0"
 
 from agent_os.agent_memory import AgentMemory
 from agent_os.approvals import ApprovalStore
@@ -33,6 +33,14 @@ from agent_os.insights import (
     Insight,
 )
 from agent_os.jobs import JobStore
+from agent_os.mcp import (
+    MCPClient,
+    MCPError,
+    MCPRegistry,
+    MCPServerConfig,
+    load_servers,
+    mcp_config_path,
+)
 from agent_os.onboarding import SetupResult, guidance, run_setup
 from agent_os.orchestrator import Orchestrator, SubResult, SubTask, SwarmResult
 from agent_os.profiles import PROFILES, AgentProfile, get_profile
@@ -77,6 +85,10 @@ __all__ = [
     "LLMReasoner",
     "JobResult",
     "JobStore",
+    "MCPClient",
+    "MCPError",
+    "MCPRegistry",
+    "MCPServerConfig",
     "OllamaProvider",
     "OpenAIProvider",
     "Orchestrator",
@@ -99,6 +111,8 @@ __all__ = [
     "get_profile",
     "get_provider",
     "guidance",
+    "load_servers",
+    "mcp_config_path",
     "propose_improvement",
     "provider_from_env",
     "redact_secrets",
