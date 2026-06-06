@@ -22,9 +22,9 @@ flowchart LR
 📐 **Full diagrams & module map:** [docs/architecture.md](docs/architecture.md) ·
 🗺️ **Modular roadmap (toward a personal agent OS):** [docs/roadmap.md](docs/roadmap.md)
 
-> Status: **v0.20 — the learning loop 💡 (gated skill proposals)**, on top of
-> cross-session recall 🔎, the MCP connector bridge 🔌, the governed swarm 🐝 +
-> hardware model advisor 🩺,
+> Status: **v0.21 — role packs 📦**, on top of the learning loop 💡 (gated skill
+> proposals), cross-session recall 🔎, the MCP connector bridge 🔌, the governed
+> swarm 🐝 + hardware model advisor 🩺,
 > Agent Skills compatibility, a one-command install + local web UI 🖥️, model
 > onboarding (Ollama/OpenAI/Claude), the Brain 🧠, and a tamper-evident governance
 > spine. The three levels (Core · Reliability · Controlled Autonomy) work and are
@@ -282,6 +282,25 @@ Listing is read-only and auto-runs; a **write/send/deploy** tool (or an ambiguou
 one) is **default-denied** to `/approve` first. Each call is a real job — traced,
 Ninja-scored, persisted, audited. Stdlib-only stdio JSON-RPC (no SDK). 🔒
 [docs/mcp.md](docs/mcp.md)
+
+## Role packs 📦 — productive in one step (v0.21)
+
+Get a non-technical user or a pro coder useful immediately with a curated bundle
+of skills (and the connectors they pair with):
+
+```bash
+agent-os cmd "/packs"                     # productivity · dev
+agent-os cmd "/pack dev"                  # its skills + recommended MCP servers
+agent-os cmd "/pack-install dev"          # copy its skills into your skills/
+```
+
+- **productivity** — inbox-triage, meeting-notes, weekly-review.
+- **dev** — code-review, debug-failing-test, write-unit-tests.
+
+Each pack ships real, model-agnostic `SKILL.md` procedures plus a **credential-free**
+`mcp.example.json` recommending the MCP servers to wire (you add your own — none
+are bundled). Installing is something **you** type (an explicit, audited action);
+the agent never installs a pack on its own.
 
 ## The learning loop 💡 — it proposes skills, you install them (v0.20)
 

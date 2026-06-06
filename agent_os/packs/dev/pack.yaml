@@ -1,0 +1,8 @@
+name: dev
+description: >-
+  A pro-coder pack — review a diff, debug a failing test, and write focused unit
+  tests. Every procedure runs through the governed router. Works with any model.
+recommended_model: qwen2.5-coder:7b
+recommended_mcp:
+  - filesystem
+  - git

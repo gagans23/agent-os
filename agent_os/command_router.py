@@ -185,6 +185,9 @@ class CommandRouter:
             "mcp": lambda a: self._mcp(),
             "mcp-tools": self._mcp_tools,
             "mcp-call": self._mcp_call,
+            "packs": lambda a: self._packs(),
+            "pack": self._pack,
+            "pack-install": self._pack_install,
             "risk": self._risk,
             "pending": lambda a: self._pending(),
             "approve": self._approve,
@@ -232,6 +235,9 @@ class CommandRouter:
             "  /mcp             list your configured MCP connector servers\n"
             "  /mcp-tools <srv> list a server's tools (with each tool's risk gate)\n"
             "  /mcp-call <srv> <tool> [json]  call an MCP tool (gated · traced · scored)\n"
+            "  /packs           list curated role packs (skills + recommended connectors)\n"
+            "  /pack <name>     show a role pack's skills + recommended MCP servers\n"
+            "  /pack-install <name>  install a pack's skills into your skills/\n"
             "  /risk <task>     show the risk classification for a task\n"
             "  /pending         list actions awaiting approval\n"
             "  /approve <id>    approve & execute a pending action\n"
@@ -785,6 +791,70 @@ class CommandRouter:
             jobs_db=str(self.jobs.db_path), audit=self.audit,
         )
         return orch.run(goal).render()
+
+    # --- Module 4: role packs ----------------------------------------------
+
+    def _packs(self) -> str:
+        """List the curated role packs available to install (read-only)."""
+        from agent_os import packs
+
+        all_packs = packs.list_packs()
+        if not all_packs:
+            return "No role packs found."
+        lines = ["Role packs (curated skill bundles):"]
+        for p in all_packs:
+            lines.append(f"  {p.name} — {p.description.strip()}")
+            lines.append(f"      skills: {', '.join(p.skills) or '(none)'}")
+        lines.append("\n/pack <name> for details · /pack-install <name> to add its skills")
+        return "\n".join(lines)
+
+    def _pack(self, args: list[str]) -> str:
+        """Show one role pack: its skills, recommended model, and MCP servers."""
+        from agent_os import packs
+
+        if not args:
+            return "Usage: /pack <name>   (see /packs)"
+        pack = packs.get_pack(args[0])
+        if not pack:
+            return f"No role pack '{args[0]}'. Try /packs."
+        lines = [f"Role pack: {pack.name}", pack.description.strip(), ""]
+        lines.append(f"Skills ({len(pack.skills)}):")
+        for name in pack.skills:
+            lines.append(f"  • {name}")
+        if pack.recommended_model:
+            lines.append(f"\nRecommended model: {pack.recommended_model}")
+        if pack.recommended_mcp:
+            lines.append("Recommended MCP servers (you wire these — no creds bundled): "
+                         + ", ".join(pack.recommended_mcp))
+        lines.append(f"\nInstall: /pack-install {pack.name}")
+        return "\n".join(lines)
+
+    def _pack_install(self, args: list[str]) -> str:
+        """Install a pack's skills into the active skills dir. Human-initiated and
+        explicit (you typed it) — so it runs directly and is audited. It only adds
+        skills; it never writes MCP credentials or changes config."""
+        from agent_os import packs
+
+        if not args:
+            return "Usage: /pack-install <name>   (see /packs)"
+        pack = packs.get_pack(args[0])
+        if not pack:
+            return f"No role pack '{args[0]}'. Try /packs."
+        report = packs.install_pack(pack, self.skills.root)
+        self.skills.reload()
+        lines = [f"📦 Installed pack '{pack.name}' → {report.dest}"]
+        if report.installed:
+            lines.append(f"  added: {', '.join(report.installed)}")
+        if report.skipped:
+            lines.append(f"  kept existing (unchanged): {', '.join(report.skipped)}")
+        if not report.installed and not report.skipped:
+            lines.append("  (pack has no skills)")
+        if pack.recommended_mcp:
+            lines.append(f"\nTip: this pack pairs with MCP servers "
+                         f"({', '.join(pack.recommended_mcp)}). Wire your own in "
+                         f"~/.agent-os/mcp.json (see /mcp) — none are added for you.")
+        lines.append("See your skills with /skills.")
+        return "\n".join(lines)
 
     # --- Module 4: MCP connector bridge ------------------------------------
 

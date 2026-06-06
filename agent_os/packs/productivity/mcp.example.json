@@ -1,0 +1,8 @@
+{
+  "_comment": "Recommended MCP servers for the productivity pack. Copy the entries you want into ~/.agent-os/mcp.json and fill in your own paths. agent-os bundles no server and no credentials — see docs/mcp.md.",
+  "servers": {
+    "filesystem": {
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/your/notes"]
+    }
+  }
+}

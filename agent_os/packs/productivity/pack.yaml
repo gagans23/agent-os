@@ -1,0 +1,7 @@
+name: productivity
+description: >-
+  A non-technical productivity pack — triage your inbox, turn messy meeting
+  notes into clear actions, and run a weekly review. Works with any model.
+recommended_model: llama3.1:8b
+recommended_mcp:
+  - filesystem

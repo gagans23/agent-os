@@ -65,6 +65,8 @@ agent_os/
   metering.py        — cost/latency/token accounting (`/cost`); est. tokens + pricing table
   insights.py / reasoners.py — cross-episode digest + LLM reasoner adapter
   improvement.py     — propose-only improvement proposals (weak runs → memory/skill-patch suggestions)
+  packs/             — bundled curated ROLE PACKS (Module 4): packs/<name>/ has pack.yaml + skills/<skill>/SKILL.md + mcp.example.json (credential-free recommendation). Loaded by packs.py
+  packs.py           — role-pack loader/installer: list_packs/get_pack (discover bundled packs under agent_os/packs/, extra roots via AGENT_OS_PACKS_PATH), install_pack (copy a pack's skills into the active skills/ dir, skip existing). Router /packs /pack <name> /pack-install <name>. Human-initiated install (you type it) runs directly + audited; never writes MCP credentials
   skill_synth.py     — the closed learning loop: turn a successful, novel, non-trivial job into a SKILL.md *draft* (propose_skill, pure). Router `_maybe_propose_skill` enqueues it as a default-deny approval; `/approve` writes it into skills/ + reloads, `/reject` discards the draft. The agent proposes; the human installs (never auto-written)
   supervisor.py / health.py / reliability.py / token_health.py / allowlist.py / daily_eval.py
 ```

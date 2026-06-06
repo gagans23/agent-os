@@ -606,3 +606,41 @@ def test_no_skill_proposed_for_trivial_default_run(tmp_path) -> None:
                     if a["command"].startswith("/skill-add ")]
     finally:
         r.close()
+
+
+# --- Module 4: role packs --------------------------------------------------
+
+
+def test_packs_lists_bundled_packs(router) -> None:
+    out = router.handle("/packs")
+    assert "productivity" in out and "dev" in out
+
+
+def test_pack_shows_details(router) -> None:
+    out = router.handle("/pack dev")
+    assert "code-review" in out and "Recommended MCP" in out
+    assert "No role pack" in router.handle("/pack nope")
+
+
+def test_pack_install_adds_skills_and_matchable(tmp_path) -> None:
+    r = _skill_router(tmp_path)  # fresh tmp skills dir
+    try:
+        out = r.handle("/pack-install productivity")
+        assert "Installed pack 'productivity'" in out
+        assert (tmp_path / "skills" / "inbox-triage" / "SKILL.md").exists()
+        # registry reloaded → the new skill is listed
+        assert "inbox-triage" in r.handle("/skills")
+        # re-install keeps existing, adds nothing
+        again = r.handle("/pack-install productivity")
+        assert "kept existing" in again
+    finally:
+        r.close()
+
+
+def test_pack_install_usage_and_unknown(tmp_path) -> None:
+    r = _skill_router(tmp_path)
+    try:
+        assert "Usage: /pack-install" in r.handle("/pack-install")
+        assert "No role pack" in r.handle("/pack-install ghost")
+    finally:
+        r.close()

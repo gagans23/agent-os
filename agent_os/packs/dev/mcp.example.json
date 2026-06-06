@@ -1,0 +1,11 @@
+{
+  "_comment": "Recommended MCP servers for the dev pack. Copy what you want into ~/.agent-os/mcp.json and set your own repo path / token. agent-os bundles no server and no credentials — see docs/mcp.md.",
+  "servers": {
+    "filesystem": {
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/your/repo"]
+    },
+    "git": {
+      "command": ["npx", "-y", "@modelcontextprotocol/server-git", "--repository", "/path/to/your/repo"]
+    }
+  }
+}
