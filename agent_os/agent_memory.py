@@ -17,6 +17,7 @@ self-improvement loop). Standard-library only (sqlite3 + markdown files).
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
@@ -66,6 +67,19 @@ class AgentMemory:
             """
         )
         self._db.commit()
+        # Full-text index over past sessions for cross-session recall (/recall).
+        # FTS5 is part of standard SQLite builds; if this build lacks it we set a
+        # flag and fall back to a substring scan over the session JSON files, so
+        # recall always works — just less ranked.
+        try:
+            self._db.execute(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5("
+                "job_id UNINDEXED, ts UNINDEXED, command, body)"
+            )
+            self._db.commit()
+            self._fts = True
+        except sqlite3.OperationalError:
+            self._fts = False
 
     @staticmethod
     def _now() -> str:
@@ -138,7 +152,107 @@ class AgentMemory:
     def save_session(self, job_id: str, payload: dict[str, Any]) -> Path:
         path = self.root / "sessions" / f"{job_id}.json"
         path.write_text(json.dumps(payload, indent=2, default=str))
+        self.index_session(job_id, payload)
         return path
+
+    # --- cross-session recall (FTS5) ---------------------------------------
+
+    @staticmethod
+    def _session_body(payload: dict[str, Any]) -> str:
+        """Searchable text for one session: the task plus its answer and tags."""
+        parts = [
+            str(payload.get("command") or ""),
+            str(payload.get("final") or payload.get("answer") or ""),
+            str(payload.get("skill") or ""),
+            str(payload.get("certification") or ""),
+        ]
+        return "\n".join(p for p in parts if p)
+
+    def index_session(self, job_id: str, payload: dict[str, Any]) -> None:
+        """Add/refresh one session in the recall index. Idempotent per job_id."""
+        if not self._fts:
+            return
+        command = str(payload.get("command") or "")
+        ts = str(payload.get("created_at") or payload.get("ts") or self._now())
+        body = self._session_body(payload)
+        self._db.execute("DELETE FROM sessions_fts WHERE job_id=?", (job_id,))
+        self._db.execute(
+            "INSERT INTO sessions_fts(job_id, ts, command, body) VALUES(?,?,?,?)",
+            (job_id, ts, command, body),
+        )
+        self._db.commit()
+
+    def reindex_sessions(self) -> int:
+        """Rebuild the recall index from the session JSON files on disk (so recall
+        covers sessions written before the index existed). Returns the count."""
+        if not self._fts:
+            return 0
+        self._db.execute("DELETE FROM sessions_fts")
+        n = 0
+        for p in (self.root / "sessions").glob("*.json"):
+            try:
+                payload = json.loads(p.read_text())
+            except (ValueError, OSError):
+                continue
+            command = str(payload.get("command") or "")
+            ts = str(payload.get("created_at") or datetime.fromtimestamp(
+                p.stat().st_mtime, tz=UTC).isoformat())
+            self._db.execute(
+                "INSERT INTO sessions_fts(job_id, ts, command, body) VALUES(?,?,?,?)",
+                (p.stem, ts, command, self._session_body(payload)),
+            )
+            n += 1
+        self._db.commit()
+        return n
+
+    @staticmethod
+    def _fts_match(query: str) -> str:
+        """Turn free text into a lenient FTS5 MATCH: prefix-match each word, OR'd
+        (recall favors breadth; bm25 ranks). Strips FTS operators to avoid syntax
+        errors on punctuation in user input."""
+        terms = re.findall(r"\w+", query.lower())
+        return " OR ".join(f"{t}*" for t in terms)
+
+    def search_sessions(self, query: str, limit: int = 8) -> list[dict[str, Any]]:
+        """Search past sessions. Uses FTS5 (ranked + snippets) when available,
+        else a substring scan over the session JSON files."""
+        query = (query or "").strip()
+        if not query:
+            return []
+        if self._fts:
+            # Lazily backfill the index the first time recall runs on old data.
+            count = self._db.execute("SELECT count(*) FROM sessions_fts").fetchone()[0]
+            if count == 0 and any((self.root / "sessions").glob("*.json")):
+                self.reindex_sessions()
+            match = self._fts_match(query)
+            if match:
+                rows = self._db.execute(
+                    "SELECT job_id, ts, command, "
+                    "snippet(sessions_fts, 3, '«', '»', '…', 12) AS snippet "
+                    "FROM sessions_fts WHERE sessions_fts MATCH ? "
+                    "ORDER BY bm25(sessions_fts) LIMIT ?",
+                    (match, limit),
+                ).fetchall()
+                if rows:
+                    return [dict(r) for r in rows]
+        return self._search_sessions_fallback(query, limit)
+
+    def _search_sessions_fallback(self, query: str, limit: int) -> list[dict[str, Any]]:
+        ql = query.lower()
+        out: list[dict[str, Any]] = []
+        for payload in self.recent_sessions(limit=200):
+            body = self._session_body(payload)
+            if ql in body.lower() or any(t in body.lower() for t in re.findall(r"\w+", ql)):
+                snippet = body.replace("\n", " ")[:120]
+                out.append({
+                    "job_id": str(payload.get("job_id") or ""),
+                    "ts": str(payload.get("created_at") or ""),
+                    "command": str(payload.get("command") or ""),
+                    "snippet": snippet,
+                })
+            if len(out) >= limit:
+                break
+        return out
 
     def recent_sessions(self, limit: int = 50) -> list[dict[str, Any]]:
         """Most-recent session payloads (newest first), for cost/metering rollups."""

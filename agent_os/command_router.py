@@ -172,6 +172,7 @@ class CommandRouter:
             "digest": lambda a: self._digest(),
             "learn": self._learn,
             "ask": self._ask,
+            "recall": self._recall,
             "audit": lambda a: self._audit(),
             "model": lambda a: self._model(),
             "doctor": lambda a: self._doctor(),
@@ -218,6 +219,7 @@ class CommandRouter:
             "  /digest          synthesize a cross-episode insight digest\n"
             "  /learn <path|text>  ingest notes/files into the knowledge base (the brain)\n"
             "  /ask <question>  answer from your knowledge base (grounded + scored)\n"
+            "  /recall <query>  search your past sessions (cross-session memory)\n"
             "  /audit           recent audit entries + chain integrity\n"
             "  /model           show the configured model provider\n"
             "  /doctor          detect hardware + recommend a local model\n"
@@ -391,6 +393,46 @@ class CommandRouter:
         g = result.result.metric_by_name("grounding") if result.result else None
         gtxt = f" · grounding {g.score:.2f}" if g and g.is_applicable else ""
         return f"{holder['answer']}\n\n[{result.verdict}{gtxt} · Job {result.job_id[-8:]}]"
+
+    def _recall(self, args: list[str]) -> str:
+        """Cross-session memory: full-text search over your past sessions. Returns
+        the ranked hits (deterministic), and — if a model is configured — a short
+        synthesis of what was done about this topic. Read-only; nothing executes."""
+        if not args:
+            return "Usage: /recall <query>   (searches your previous /run, /ask, /swarm …)"
+        query = " ".join(args)
+        hits = self.memory.search_sessions(query, limit=8)
+        if not hits:
+            return (f"No past sessions match '{query}'. "
+                    "Recall searches what you've already done (/run, /ask, /swarm …).")
+        lines = [f"🔎 {len(hits)} past session(s) about '{query}':", ""]
+        for h in hits:
+            day = (h.get("ts") or "")[:10]
+            cmd = (h.get("command") or "").strip()[:64]
+            snip = (h.get("snippet") or "").strip()
+            lines.append(f"  • {day}  {cmd}  (job {h.get('job_id', '')[-8:]})")
+            if snip:
+                lines.append(f"        …{snip}…")
+        listing = "\n".join(lines)
+
+        if self.provider is None:
+            return listing
+        try:
+            evidence = "\n".join(
+                f"- [{(h.get('ts') or '')[:10]}] {h.get('command', '')}: "
+                f"{(h.get('snippet') or '').strip()}"
+                for h in hits
+            )
+            synthesis = self.provider.complete(
+                f"The user asks to recall: {query}\n\n"
+                f"Here are excerpts from their past sessions:\n{evidence}\n\n"
+                "In 2–4 sentences, summarize what they did about this and any "
+                "useful takeaway. Use ONLY the excerpts; if they don't cover it, say so.",
+                system="You summarize a user's own past activity faithfully and concisely.",
+            ).strip()
+        except Exception:  # noqa: BLE001 - synthesis is a bonus; never break recall
+            return listing
+        return f"{synthesis}\n\n{listing}" if synthesis else listing
 
     def _audit(self) -> str:
         ok, broken = self.audit.verify()

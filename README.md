@@ -22,8 +22,8 @@ flowchart LR
 📐 **Full diagrams & module map:** [docs/architecture.md](docs/architecture.md) ·
 🗺️ **Modular roadmap (toward a personal agent OS):** [docs/roadmap.md](docs/roadmap.md)
 
-> Status: **v0.18 — the MCP connector bridge 🔌**, on top of the governed swarm 🐝
-> + hardware model advisor 🩺,
+> Status: **v0.19 — cross-session recall 🔎**, on top of the MCP connector bridge
+> 🔌, the governed swarm 🐝 + hardware model advisor 🩺,
 > Agent Skills compatibility, a one-command install + local web UI 🖥️, model
 > onboarding (Ollama/OpenAI/Claude), the Brain 🧠, and a tamper-evident governance
 > spine. The three levels (Core · Reliability · Controlled Autonomy) work and are
@@ -140,6 +140,25 @@ Based on your notes:
 those chunks to **Ninja Harness as grounding references** — so the answer is
 *scored against the source*, and ungrounded answers get flagged. Upload notes,
 files, or whole folders; it becomes the brain every agent retrieves from.
+
+**Cross-session recall (v0.19).** Beyond what you *teach* it, agent-os remembers
+what you've *done*. Every run is indexed (the task **and** its answer) into a
+local SQLite **FTS5** index, searchable with `/recall`:
+
+```bash
+agent-os cmd "/recall the budget summary from last week"
+```
+
+```
+You summarized the Q2 budget on 2026-06-02: revenue up, costs flat. …
+
+🔎 2 past session(s) about 'budget summary':
+  • 2026-06-02  run summarize the budget  (job 7f3a2c10)
+        …Revenue up, «costs» «flat»…
+```
+
+Read-only (auto-runs), deterministic ranking; if a model is configured it adds a
+short faithful synthesis of the hits. Stdlib-only — no vector DB, no service.
 
 ```python
 from agent_os.context import ContextStore

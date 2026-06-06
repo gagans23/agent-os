@@ -478,3 +478,31 @@ def test_mcp_call_unknown_server(tmp_path) -> None:
         assert "No MCP server 'ghost'" in r.handle("/mcp-call ghost read_note {}")
     finally:
         r.close()
+
+
+# --- cross-session recall --------------------------------------------------
+
+
+def test_recall_searches_past_sessions(router) -> None:
+    # Seed a couple of past sessions, then recall by topic.
+    router.memory.save_session("job-frac", {
+        "job_id": "job-frac", "command": "ask how do I add fractions",
+        "final": "Add the numerators when the denominators match.",
+        "created_at": "2026-06-01T09:00:00+00:00",
+    })
+    router.memory.save_session("job-bgt", {
+        "job_id": "job-bgt", "command": "run summarize the budget",
+        "final": "Revenue up, costs flat.", "created_at": "2026-06-02T09:00:00+00:00",
+    })
+    out = router.handle("/recall fractions")
+    assert "past session" in out and "add fractions" in out
+    # A topic that doesn't exist returns a friendly empty message.
+    assert "No past sessions match" in router.handle("/recall quantum chromodynamics")
+
+
+def test_recall_usage_when_empty(router) -> None:
+    assert "Usage: /recall" in router.handle("/recall")
+
+
+def test_recall_listed_in_help(router) -> None:
+    assert "/recall" in router.handle("/help")

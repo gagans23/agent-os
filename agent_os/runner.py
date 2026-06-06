@@ -16,6 +16,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from agent_os.agent_memory import AgentMemory
@@ -162,7 +163,9 @@ def run_job(
         )
 
     memory.save_session(job.job_id, {
+        "job_id": job.job_id,
         "command": command,
+        "final": final,                 # the (redacted) answer — powers /recall
         "profile": prof.name,
         "skill": skill.name if skill else None,
         "certification": result.certification if result else None,
@@ -171,6 +174,7 @@ def run_job(
         "latency_s": latency_s,
         "in_tokens": in_tokens,
         "out_tokens": out_tokens,
+        "created_at": datetime.now(UTC).isoformat(),
     })
 
     # Platform verdict honors the profile threshold: a Ninja-PASS run that falls

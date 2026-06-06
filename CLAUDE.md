@@ -55,7 +55,7 @@ agent_os/
   jobs.py            — SQLite job store
   runner.py          — the loop (execute → trace → Ninja eval → propose)
   trace_recorder.py  — per-job trace artifacts
-  agent_memory.py    — persistent memory (MEMORY/USER/state.db/sessions)
+  agent_memory.py    — persistent memory (MEMORY/USER/state.db/sessions) + cross-session recall: an FTS5 index over past sessions (command + answer), `search_sessions`/`reindex_sessions`, surfaced as router `/recall` (read-only; optional model synthesis of hits). Falls back to a substring scan if the SQLite build lacks FTS5
   skill_registry.py  — load skills from skills/*/SKILL.md
   profiles.py        — researcher/operator/builder/qa
   orchestrator.py    — the governed swarm: decompose → parallel → synthesize (Module 6)
