@@ -22,8 +22,9 @@ flowchart LR
 📐 **Full diagrams & module map:** [docs/architecture.md](docs/architecture.md) ·
 🗺️ **Modular roadmap (toward a personal agent OS):** [docs/roadmap.md](docs/roadmap.md)
 
-> Status: **v0.19 — cross-session recall 🔎**, on top of the MCP connector bridge
-> 🔌, the governed swarm 🐝 + hardware model advisor 🩺,
+> Status: **v0.20 — the learning loop 💡 (gated skill proposals)**, on top of
+> cross-session recall 🔎, the MCP connector bridge 🔌, the governed swarm 🐝 +
+> hardware model advisor 🩺,
 > Agent Skills compatibility, a one-command install + local web UI 🖥️, model
 > onboarding (Ollama/OpenAI/Claude), the Brain 🧠, and a tamper-evident governance
 > spine. The three levels (Core · Reliability · Controlled Autonomy) work and are
@@ -281,6 +282,24 @@ Listing is read-only and auto-runs; a **write/send/deploy** tool (or an ambiguou
 one) is **default-denied** to `/approve` first. Each call is a real job — traced,
 Ninja-scored, persisted, audited. Stdlib-only stdio JSON-RPC (no SDK). 🔒
 [docs/mcp.md](docs/mcp.md)
+
+## The learning loop 💡 — it proposes skills, you install them (v0.20)
+
+A personal agent should get better at *your* work over time. When a task
+**succeeds, is novel** (no existing skill covered it), **and was non-trivial**,
+agent-os drafts a reusable `SKILL.md` from the job's own trace — and **gates it**:
+
+```
+[risk: READ_ONLY → auto-run]
+… result …
+💡 I can turn this into a reusable skill 'research-top-local-llm-runtimes'.
+   Review & save:  /approve a1b2c3d4   ·   discard: /reject a1b2c3d4
+```
+
+`/approve` writes it into `skills/` (now matchable); `/reject` discards the draft.
+This is the self-improving-agent idea (cf. Hermes Agent's "skills from experience")
+done **true to the gate**: the agent *proposes*, the human *installs* — a new
+capability is **never written silently**.
 
 ## Trust & Governance — tamper-evident by default (v0.6)
 

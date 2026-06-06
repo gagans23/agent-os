@@ -506,3 +506,103 @@ def test_recall_usage_when_empty(router) -> None:
 
 def test_recall_listed_in_help(router) -> None:
     assert "/recall" in router.handle("/help")
+
+
+# --- the learning loop: gated skill proposals ------------------------------
+
+from types import SimpleNamespace  # noqa: E402
+
+
+def _skill_router(tmp_path):
+    """A router whose skills dir is a fresh tmp dir (so tests never write into the
+    repo's real skills/)."""
+    skills_dir = tmp_path / "skills"
+    skills_dir.mkdir()
+    return CommandRouter(
+        jobs=JobStore(tmp_path / "jobs.db"),
+        memory=AgentMemory(tmp_path / "state"),
+        skills=SkillRegistry(skills_dir),
+        recorder=TraceRecorder(tmp_path / "traces"),
+    )
+
+
+def _write_trace(tmp_path) -> str:
+    trace = {
+        "job_id": "job-1",
+        "steps": [
+            {"step_type": "plan", "output": "List the top local LLM runtimes."},
+            {"step_type": "action", "output": "Compare license, RAM, speed."},
+            {"step_type": "observation", "output": "Built a comparison table."},
+        ],
+        "tool_calls": [{"tool_name": "browser_open"}],
+    }
+    p = tmp_path / "trace.json"
+    p.write_text(_json.dumps(trace))
+    return str(p)
+
+
+def test_skill_proposal_enqueued_and_approved_writes_skill(tmp_path) -> None:
+    r = _skill_router(tmp_path)
+    try:
+        result = SimpleNamespace(ninja_score=92.0, certification="PASS", skill=None,
+                     trace_path=_write_trace(tmp_path))
+        hint = r._maybe_propose_skill(
+            "research the top local LLM runtimes and compare them", result)
+        assert "reusable skill" in hint
+        pending = [a for a in r.approvals.list(status="pending")
+                   if a["command"].startswith("/skill-add ")]
+        assert len(pending) == 1
+
+        # Approve → the SKILL.md is written and the registry picks it up.
+        out = r.handle(f"/approve {pending[0]['id']}")
+        assert "Saved new skill" in out
+        skill_md = tmp_path / "skills" / "research-top-local-llm-runtimes" / "SKILL.md"
+        assert skill_md.exists()
+        assert "research-top-local-llm-runtimes" in r.handle("/skills")
+    finally:
+        r.close()
+
+
+def test_skill_proposal_is_not_duplicated(tmp_path) -> None:
+    r = _skill_router(tmp_path)
+    try:
+        result = SimpleNamespace(ninja_score=92.0, certification="PASS", skill=None,
+                     trace_path=_write_trace(tmp_path))
+        cmd = "research the top local LLM runtimes and compare them"
+        assert "reusable skill" in r._maybe_propose_skill(cmd, result)
+        assert r._maybe_propose_skill(cmd, result) == ""  # no duplicate proposal
+        pending = [a for a in r.approvals.list(status="pending")
+                   if a["command"].startswith("/skill-add ")]
+        assert len(pending) == 1
+    finally:
+        r.close()
+
+
+def test_skill_proposal_rejected_discards_draft(tmp_path) -> None:
+    r = _skill_router(tmp_path)
+    try:
+        result = SimpleNamespace(ninja_score=92.0, certification="PASS", skill=None,
+                     trace_path=_write_trace(tmp_path))
+        r._maybe_propose_skill("research the top local LLM runtimes and compare", result)
+        pending = [a for a in r.approvals.list(status="pending")
+                   if a["command"].startswith("/skill-add ")][0]
+        draft_id = pending["command"].split()[1]
+        draft_file = tmp_path / "state" / "skill_drafts" / f"{draft_id}.md"
+        assert draft_file.exists()
+        assert "Rejected" in r.handle(f"/reject {pending['id']}")
+        assert not draft_file.exists()  # draft cleaned up on reject
+    finally:
+        r.close()
+
+
+def test_no_skill_proposed_for_trivial_default_run(tmp_path) -> None:
+    # The default deterministic agent produces a thin trace (2 steps, no tools),
+    # so a plain /run must NOT spam a skill proposal.
+    r = _skill_router(tmp_path)
+    try:
+        out = r.handle("/run look up something simple")
+        assert "reusable skill" not in out
+        assert not [a for a in r.approvals.list(status="pending")
+                    if a["command"].startswith("/skill-add ")]
+    finally:
+        r.close()

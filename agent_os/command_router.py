@@ -755,7 +755,8 @@ class CommandRouter:
         label = "AMBIGUOUS" if assessment.ambiguous else assessment.level.label
         if not assessment.requires_approval:
             result, summary = self._execute(task, self._profile_for("READ_ONLY"))
-            return f"[risk: READ_ONLY → auto-run]\n{summary}\n{self._meter_line(result)}"
+            return (f"[risk: READ_ONLY → auto-run]\n{summary}\n{self._meter_line(result)}"
+                    + self._maybe_propose_skill(task, result))
         approval_id = self.approvals.enqueue(
             task, self._profile_for(assessment.level.label), label, assessment.reason,
         )
@@ -938,12 +939,18 @@ class CommandRouter:
             return f"No approval found matching '{args[0]}'."
         if rec["status"] != "pending":
             return f"Approval {rec['id']} is already {rec['status']}."
+        if rec["command"].startswith("/skill-add "):
+            msg = self._apply_skill_add(rec["command"])
+            self.approvals.set_decision(rec["id"], "approved")
+            return f"✅ Approved [{rec['risk_level']}].\n{msg}"
         if rec["command"].startswith("/mcp-call "):
             result, summary = self._dispatch_mcp_command(rec["command"])
         else:
             result, summary = self._execute(rec["command"], rec["profile"])
         self.approvals.set_decision(rec["id"], "approved", job_id=result.job_id)
-        return f"✅ Approved & executed [{rec['risk_level']}].\n{summary}"
+        hint = self._maybe_propose_skill(rec["command"], result) \
+            if not rec["command"].startswith("/mcp-call ") else ""
+        return f"✅ Approved & executed [{rec['risk_level']}].\n{summary}{hint}"
 
     def _reject(self, args: list[str]) -> str:
         if not args:
@@ -953,8 +960,77 @@ class CommandRouter:
             return f"No approval found matching '{args[0]}'."
         if rec["status"] != "pending":
             return f"Approval {rec['id']} is already {rec['status']}."
+        if rec["command"].startswith("/skill-add "):
+            self._discard_skill_draft(rec["command"])
         self.approvals.set_decision(rec["id"], "rejected")
         return f"🚫 Rejected approval {rec['id']}. No action taken."
+
+    # --- the learning loop: gated skill proposals --------------------------
+
+    def _drafts_dir(self) -> Path:
+        d = Path(self.memory.root) / "skill_drafts"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    def _maybe_propose_skill(self, command: str, result) -> str:
+        """After a successful, novel, non-trivial task, draft a reusable skill and
+        enqueue it for approval (default-deny). Returns a one-line hint to append
+        to the reply, or '' if nothing was proposed. Never raises."""
+        try:
+            import uuid
+
+            from agent_os import skill_synth
+
+            trace: dict = {}
+            tp = getattr(result, "trace_path", None)
+            if tp and Path(tp).exists():
+                trace = json.loads(Path(tp).read_text())
+            draft = skill_synth.propose_skill(
+                command,
+                score=getattr(result, "ninja_score", 0.0),
+                certification=getattr(result, "certification", ""),
+                matched_skill=getattr(result, "skill", None),
+                trace=trace,
+                existing_names={s.name for s in self.skills.all()},
+            )
+            if draft is None:
+                return ""
+            # Don't stack duplicate proposals for the same skill name.
+            for a in self.approvals.list(status="pending"):
+                if a["command"].startswith("/skill-add ") and a["command"].endswith(f" {draft.name}"):
+                    return ""
+            draft_id = uuid.uuid4().hex[:8]
+            (self._drafts_dir() / f"{draft_id}.md").write_text(draft.to_markdown())
+            approval_id = self.approvals.enqueue(
+                f"/skill-add {draft_id} {draft.name}", "builder", "SKILL",
+                f"new reusable skill learned from a successful task: {draft.name}",
+            )
+            return (f"\n\n💡 I can turn this into a reusable skill '{draft.name}'. "
+                    f"Review & save:  /approve {approval_id}   ·   discard: /reject {approval_id}")
+        except Exception:  # noqa: BLE001 - proposing must never break the task
+            return ""
+
+    def _apply_skill_add(self, command: str) -> str:
+        """Write an approved skill draft into skills/ and reload the registry."""
+        parts = command.split(maxsplit=2)
+        if len(parts) < 3:
+            return "Malformed skill-add request; nothing applied."
+        draft_id, name = parts[1], parts[2]
+        draft_path = self._drafts_dir() / f"{draft_id}.md"
+        if not draft_path.exists():
+            return f"Skill draft '{draft_id}' is no longer available; nothing applied."
+        dest = Path(self.skills.root) / name / "SKILL.md"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(draft_path.read_text())
+        draft_path.unlink(missing_ok=True)
+        self.skills.reload()
+        return (f"🧠 Saved new skill '{name}' → {dest}. "
+                f"It's now matchable — see /skills.")
+
+    def _discard_skill_draft(self, command: str) -> None:
+        parts = command.split(maxsplit=2)
+        if len(parts) >= 2:
+            (self._drafts_dir() / f"{parts[1]}.md").unlink(missing_ok=True)
 
     def _job(self, args: list[str]) -> str:
         if not args:

@@ -10,7 +10,7 @@ Gmail, Cloudflare Tunnel) are pluggable adapters you wire with your own
 credentials — none are bundled or faked.
 """
 
-__version__ = "0.19.0"
+__version__ = "0.20.0"
 
 from agent_os.agent_memory import AgentMemory
 from agent_os.approvals import ApprovalStore
@@ -61,6 +61,7 @@ from agent_os.reasoners import LLMReasoner
 from agent_os.risk import RiskAssessment, RiskLevel, classify_risk
 from agent_os.runner import JobResult, run_job
 from agent_os.skill_registry import Skill, SkillRegistry
+from agent_os.skill_synth import SkillDraft, propose_skill
 from agent_os.trace_recorder import JobRecorder, TraceRecorder
 
 __all__ = [
@@ -99,6 +100,7 @@ __all__ = [
     "RiskLevel",
     "SetupResult",
     "Skill",
+    "SkillDraft",
     "SkillRegistry",
     "SubResult",
     "SubTask",
@@ -114,6 +116,7 @@ __all__ = [
     "load_servers",
     "mcp_config_path",
     "propose_improvement",
+    "propose_skill",
     "provider_from_env",
     "redact_secrets",
     "redaction_hook",

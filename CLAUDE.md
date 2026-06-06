@@ -64,7 +64,8 @@ agent_os/
   onboarding.py      — guided "click a button" setup (`agent-os setup` / `setup --run`, `/setup`); persists provider choice to ~/.agent-os/config.json (never installs Ollama itself). UI pull runs as a BACKGROUND job (router.start_onboarding → daemon thread; `/api/setup` returns at once, `/api/setup/status` polled for live progress; `/api/setup/plan` previews the pick). doctor.smart_pick prefers an already-downloaded capable model (instant enable) and offers the hardware recommendation as an optional upgrade
   metering.py        — cost/latency/token accounting (`/cost`); est. tokens + pricing table
   insights.py / reasoners.py — cross-episode digest + LLM reasoner adapter
-  improvement.py     — propose-only improvement proposals
+  improvement.py     — propose-only improvement proposals (weak runs → memory/skill-patch suggestions)
+  skill_synth.py     — the closed learning loop: turn a successful, novel, non-trivial job into a SKILL.md *draft* (propose_skill, pure). Router `_maybe_propose_skill` enqueues it as a default-deny approval; `/approve` writes it into skills/ + reloads, `/reject` discards the draft. The agent proposes; the human installs (never auto-written)
   supervisor.py / health.py / reliability.py / token_health.py / allowlist.py / daily_eval.py
 ```
 
